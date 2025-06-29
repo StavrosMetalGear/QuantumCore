@@ -1,36 +1,29 @@
 ﻿#include "pch.h"
 #include <iostream>
-#include <complex>
-#include <vector>
-#include "Solver.h" // Include your solver functions
-
-// Define PI if not available
-#ifndef M_PI
-#define M_PI 3.14159265358979
-#endif
+#include "QuantumParticle.h"
 
 int main() {
-    std::cout << "Quantum Solver Program Starting...\n";
+    std::cout << "Quantum Mechanics Simulation\n";
 
-    // Define user input (could be later made interactive)
-    double mass = 1.0;          // Mass in kg
-    double length = 1.0;        // Length of box in meters
-    double potential = 0.0;     // Potential in joules
+    // Create a particle
+    QuantumParticle particle("Electron", 9.11e-31, 1e-10, 1);
 
-    // Call the Schrödinger energy calculator
-    double energy = SolveSchrodinger(mass, length, potential);
-    std::cout << "Calculated Energy: " << energy << " J\n";
+    int n;
+    std::cout << "Select energy level n: ";
+    std::cin >> n;
 
-    // Superposition coefficients for 2 states (complex values)
-    std::vector<std::complex<double>> coefficients = {
-        std::complex<double>(1.0, 0.0),  // 100% in state 1
-        std::complex<double>(0.5, 0.5)   // 50% real, 50% imaginary in state 2
-    };
+    // Compute and show energy
+    double energy = particle.computeEnergy1DBox(n);
+    std::cout << "Energy level " << n << ": " << energy << " J\n";
 
-    // Call the wavefunction simulation
-    simulate_wavefunction(length, mass, 2, coefficients);
+    // Export psi(x)
+    particle.exportWavefunctionCSV("wavefunction.csv", n, 100);
+    std::cout << "Wavefunction exported to wavefunction.csv\n";
 
-    std::cout << "Wavefunction simulation complete. Results saved to wavefunction.csv.\n";
+    // Example: show psi(x,t) at one point
+    auto psi_xt = particle.computeTimeDependentPsi1DBox(n, 0.5e-10, 1e-15);
+    std::cout << "Psi at x=0.5 Å, t=1 fs: Re=" << psi_xt.real() << " Im=" << psi_xt.imag() << "\n";
 
     return 0;
 }
+

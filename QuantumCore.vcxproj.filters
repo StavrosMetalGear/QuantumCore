@@ -24,6 +24,9 @@
     <ClInclude Include="Solver.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="QuantumParticle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -36,6 +39,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="QuantumParticle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
