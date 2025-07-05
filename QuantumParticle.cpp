@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "QuantumParticle.h"
 #include <cmath>
 #include <fstream>
@@ -67,15 +67,66 @@ std::vector<std::complex<double>> QuantumParticle::computeMomentumSpaceWavefunct
 }
 
 // Export psi(x) to CSV
-void QuantumParticle::exportWavefunctionCSV(const std::string& filename, int n, int numPoints) {
-    std::ofstream out(filename);
+void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints) {
+    std::ofstream out(filename);   // ✅ this line
     out << "x,psi\n";
-    double dx = length / numPoints;
+
+    double xMax = 1e-9;  // +/-1 nm
+    double dx = 2 * xMax / numPoints;
+
     for (int i = 0; i < numPoints; ++i) {
-        double x = i * dx;
-        double psi = sqrt(2.0 / length) * sin(n * M_PI * x / length);
+        double x = -xMax + i * dx;
+        double psi = computeHarmonicOscillatorPsi(n, x, omega);
         out << x << "," << psi << "\n";
     }
+
     out.close();
 }
 
+
+
+// 1D Harmonic Oscillator Energy
+double QuantumParticle::computeEnergy1DHarmonicOscillator(int n, double omega) {
+    const double hbar = 1.0545718e-34;
+    return hbar * omega * (n + 0.5);
+}
+
+// 1D Harmonic Oscillator wavefunction at position x
+double QuantumParticle::computeHarmonicOscillatorPsi(int n, double x, double omega) {
+    const double hbar = 1.0545718e-34;
+
+    double alpha = mass * omega / hbar;
+    double normalization = pow(alpha / M_PI, 0.25) / sqrt(pow(2.0, n) * tgamma(n + 1));
+
+    double hermite;
+    // For simplicity, hard-code n=0 and n=1 Hermite polynomials
+    if (n == 0) {
+        hermite = 1.0;
+    }
+    else if (n == 1) {
+        hermite = 2.0 * sqrt(alpha) * x;
+    }
+    else {
+        hermite = 0.0; // Extend later for higher n
+    }
+
+    double gaussian = exp(-0.5 * alpha * x * x);
+    return normalization * hermite * gaussian;
+}
+
+// Export HO wavefunction to CSV
+void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints) {
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMax = 1e-9;  // +/-1 nm range
+    double dx = 2 * xMax / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -xMax + i * dx;
+        double psi = computeHarmonicOscillatorPsi(n, x, omega);
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}

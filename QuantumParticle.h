@@ -30,7 +30,13 @@ public:
 
     // Save wavefunction to CSV automatically
     void exportWavefunctionCSV(const std::string& filename, int n, int numPoints);
+    // 1D Harmonic Oscillator
+    double computeEnergy1DHarmonicOscillator(int n, double omega);
+    double computeHarmonicOscillatorPsi(int n, double x, double omega);
+
+    // Exports
+    void exportHarmonicOscillatorWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints);
 };
 
-}
+
 
