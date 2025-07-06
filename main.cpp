@@ -10,33 +10,54 @@ int main() {
     std::cout << "Select potential type:\n";
     std::cout << "1 - Infinite Square Well\n";
     std::cout << "2 - Harmonic Oscillator\n";
+    std::cout << "3 - Finite Square Well\n";
+    std::cout << "4 - Coulomb Potential\n";
+
     int choice;
     std::cin >> choice;
 
-    int n;
-    std::cout << "Enter energy level n: ";
-    std::cin >> n;
-
     if (choice == 1) {
+        int n;
+        std::cout << "Enter energy level n: ";
+        std::cin >> n;
+
         double energy = particle.computeEnergy1DBox(n);
         std::cout << "Energy: " << energy << " J\n";
-
         particle.exportWavefunctionCSV("box_wavefunction.csv", n, 100);
-        std::cout << "Wavefunction saved to box_wavefunction.csv\n";
-
     }
     else if (choice == 2) {
+        int n;
         double omega;
-        std::cout << "Enter angular frequency omega (rad/s): ";
+        std::cout << "Enter energy level n: ";
+        std::cin >> n;
+        std::cout << "Enter omega: ";
         std::cin >> omega;
 
         double energy = particle.computeEnergy1DHarmonicOscillator(n, omega);
         std::cout << "Energy: " << energy << " J\n";
-
         particle.exportHarmonicOscillatorWavefunctionCSV("oscillator_wavefunction.csv", n, omega, 100);
-        std::cout << "Wavefunction saved to oscillator_wavefunction.csv\n";
+    }
+    else if (choice == 3) {
+        double V0;
+        std::cout << "Enter potential depth V0 (J): ";
+        std::cin >> V0;
+
+        double energy = particle.computeGroundStateEnergyFiniteSquareWell(V0, 50);
+        std::cout << "Ground state energy: " << energy << " J\n";
+        particle.exportFiniteSquareWellWavefunctionCSV("finite_well_wavefunction.csv", V0, energy, 100);
+    }
+    else if (choice == 4) {
+        int n;
+        double Z;
+        std::cout << "Enter principal quantum number n: ";
+        std::cin >> n;
+        std::cout << "Enter atomic number Z: ";
+        std::cin >> Z;
+
+        double energy = particle.computeCoulombEnergy(n, Z);
+        std::cout << "Energy: " << energy << " J\n";
+        particle.exportCoulombWavefunctionCSV("coulomb_wavefunction.csv", n, Z, 100);
     }
 
     return 0;
 }
-

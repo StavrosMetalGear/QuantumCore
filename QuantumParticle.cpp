@@ -12,17 +12,15 @@ QuantumParticle::QuantumParticle(std::string name, double mass, double length, i
     : name(name), mass(mass), length(length), dimension(dimension) {
 }
 
-// Energy of 1D infinite square well
+// Infinite Square Well
 double QuantumParticle::computeEnergy1DBox(int n) {
     const double hbar = 1.0545718e-34;
     return (n * n * M_PI * M_PI * hbar * hbar) / (2.0 * mass * length * length);
 }
 
-// Real-space wavefunction sampled over numPoints
 std::vector<double> QuantumParticle::computeWavefunction1DBox(int n, int numPoints) {
     std::vector<double> psi;
     double dx = length / numPoints;
-
     for (int i = 0; i < numPoints; ++i) {
         double x = i * dx;
         double value = sqrt(2.0 / length) * sin(n * M_PI * x / length);
@@ -31,7 +29,6 @@ std::vector<double> QuantumParticle::computeWavefunction1DBox(int n, int numPoin
     return psi;
 }
 
-// Time-dependent wavefunction at x, t
 std::complex<double> QuantumParticle::computeTimeDependentPsi1DBox(int n, double x, double t) {
     const double hbar = 1.0545718e-34;
     double E_n = computeEnergy1DBox(n);
@@ -40,7 +37,6 @@ std::complex<double> QuantumParticle::computeTimeDependentPsi1DBox(int n, double
     return spatial * phase;
 }
 
-// Momentum space wavefunction (Fourier transform approx)
 std::vector<std::complex<double>> QuantumParticle::computeMomentumSpaceWavefunction1DBox(int n, int numPoints) {
     const double hbar = 1.0545718e-34;
     double pMax = 1e-23;
@@ -66,40 +62,30 @@ std::vector<std::complex<double>> QuantumParticle::computeMomentumSpaceWavefunct
     return phi;
 }
 
-// Export psi(x) to CSV
-void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints) {
-    std::ofstream out(filename);   // ✅ this line
+void QuantumParticle::exportWavefunctionCSV(const std::string& filename, int n, int numPoints) {
+    std::ofstream out(filename);
     out << "x,psi\n";
-
-    double xMax = 1e-9;  // +/-1 nm
-    double dx = 2 * xMax / numPoints;
-
+    double dx = length / numPoints;
     for (int i = 0; i < numPoints; ++i) {
-        double x = -xMax + i * dx;
-        double psi = computeHarmonicOscillatorPsi(n, x, omega);
+        double x = i * dx;
+        double psi = sqrt(2.0 / length) * sin(n * M_PI * x / length);
         out << x << "," << psi << "\n";
     }
-
     out.close();
 }
 
-
-
-// 1D Harmonic Oscillator Energy
+// Harmonic oscillator
 double QuantumParticle::computeEnergy1DHarmonicOscillator(int n, double omega) {
     const double hbar = 1.0545718e-34;
     return hbar * omega * (n + 0.5);
 }
 
-// 1D Harmonic Oscillator wavefunction at position x
 double QuantumParticle::computeHarmonicOscillatorPsi(int n, double x, double omega) {
     const double hbar = 1.0545718e-34;
-
     double alpha = mass * omega / hbar;
     double normalization = pow(alpha / M_PI, 0.25) / sqrt(pow(2.0, n) * tgamma(n + 1));
 
     double hermite;
-    // For simplicity, hard-code n=0 and n=1 Hermite polynomials
     if (n == 0) {
         hermite = 1.0;
     }
@@ -107,26 +93,121 @@ double QuantumParticle::computeHarmonicOscillatorPsi(int n, double x, double ome
         hermite = 2.0 * sqrt(alpha) * x;
     }
     else {
-        hermite = 0.0; // Extend later for higher n
+        hermite = 0.0; // Extend later
     }
 
     double gaussian = exp(-0.5 * alpha * x * x);
     return normalization * hermite * gaussian;
 }
 
-// Export HO wavefunction to CSV
-void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints) {
+void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(
+    const std::string& filename,
+    int n,
+    double omega,
+    int numPoints)
+{
     std::ofstream out(filename);
     out << "x,psi\n";
-
-    double xMax = 1e-9;  // +/-1 nm range
+    double xMax = 1e-9;
     double dx = 2 * xMax / numPoints;
-
     for (int i = 0; i < numPoints; ++i) {
         double x = -xMax + i * dx;
         double psi = computeHarmonicOscillatorPsi(n, x, omega);
         out << x << "," << psi << "\n";
     }
+    out.close();
+}
 
+// Finite square well
+double QuantumParticle::computeGroundStateEnergyFiniteSquareWell(double V0, int numIterations) {
+    const double hbar = 1.0545718e-34;
+    double a = this->length / 2.0;
+    double m = mass;
+
+    double E_low = -V0 + 1e-22;
+    double E_high = 1e-22;
+
+    auto f = [&](double E) {
+        double k = sqrt(2 * m * (E + V0)) / hbar;
+        double kappa = sqrt(2 * m * (-E)) / hbar;
+        return k * tan(k * a) - kappa;
+        };
+
+    double mid = 0;
+    for (int i = 0; i < numIterations; ++i) {
+        mid = 0.5 * (E_low + E_high);
+        double val = f(mid);
+        if (val > 0) {
+            E_high = mid;
+        }
+        else {
+            E_low = mid;
+        }
+    }
+    return mid;
+}
+
+void QuantumParticle::exportFiniteSquareWellWavefunctionCSV(
+    const std::string& filename,
+    double V0,
+    double energy,
+    int numPoints)
+{
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    const double hbar = 1.0545718e-34;
+    double a = length / 2.0;
+    double m = mass;
+
+    double k = sqrt(2.0 * m * (energy + V0)) / hbar;
+    double kappa = sqrt(-2.0 * m * energy) / hbar;
+
+    double A = 1.0;
+    double B = A * sin(k * a) / exp(-kappa * a);
+
+    double dx = (2.0 * a) / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -a + i * dx;
+        double psi;
+        if (fabs(x) <= a) {
+            psi = A * sin(k * x);
+        }
+        else {
+            psi = B * exp(-kappa * fabs(x));
+        }
+        out << x << "," << psi << "\n";
+    }
+    out.close();
+}
+
+// Coulomb potential
+double QuantumParticle::computeCoulombEnergy(int n, double Z) {
+    const double e = 1.602176634e-19;
+    const double epsilon0 = 8.854187817e-12;
+    const double hbar = 1.0545718e-34;
+    double prefactor = -(Z * Z * mass * e * e) / (8 * epsilon0 * epsilon0 * hbar * hbar);
+    return prefactor / (n * n);
+}
+
+void QuantumParticle::exportCoulombWavefunctionCSV(
+    const std::string& filename,
+    int n,
+    double Z,
+    int numPoints)
+{
+    std::ofstream out(filename);
+    out << "r,psi\n";
+
+    double rMax = 1e-9;
+    double dr = rMax / numPoints;
+    double lambda = Z / n;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double r = dr * i;
+        double psi = exp(-lambda * r);
+        out << r << "," << psi << "\n";
+    }
     out.close();
 }
