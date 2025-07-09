@@ -147,40 +147,6 @@ double QuantumParticle::computeGroundStateEnergyFiniteSquareWell(double V0, int 
     return mid;
 }
 
-void QuantumParticle::exportFiniteSquareWellWavefunctionCSV(
-    const std::string& filename,
-    double V0,
-    double energy,
-    int numPoints)
-{
-    std::ofstream out(filename);
-    out << "x,psi\n";
-
-    const double hbar = 1.0545718e-34;
-    double a = length / 2.0;
-    double m = mass;
-
-    double k = sqrt(2.0 * m * (energy + V0)) / hbar;
-    double kappa = sqrt(-2.0 * m * energy) / hbar;
-
-    double A = 1.0;
-    double B = A * sin(k * a) / exp(-kappa * a);
-
-    double dx = (2.0 * a) / numPoints;
-
-    for (int i = 0; i < numPoints; ++i) {
-        double x = -a + i * dx;
-        double psi;
-        if (fabs(x) <= a) {
-            psi = A * sin(k * x);
-        }
-        else {
-            psi = B * exp(-kappa * fabs(x));
-        }
-        out << x << "," << psi << "\n";
-    }
-    out.close();
-}
 
 // Coulomb potential
 double QuantumParticle::computeCoulombEnergy(int n, double Z) {
@@ -211,3 +177,129 @@ void QuantumParticle::exportCoulombWavefunctionCSV(
     }
     out.close();
 }
+void QuantumParticle::exportFiniteSquareWellWavefunctionCSV(
+    const std::string& filename,
+    double V0,
+    double energy,
+    int numPoints)
+{
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    const double hbar = 1.0545718e-34;
+    double a = this->length / 2.0;
+    double m = this->mass;
+
+    double k = sqrt(2.0 * m * (energy + V0)) / hbar;
+    double kappa = sqrt(-2.0 * m * energy) / hbar;
+
+    // Get normalization factor
+    double norm = this->computeFiniteSquareWellNormalization(V0, energy, 500);
+
+    double A = norm;
+    double B = A * sin(k * a) / exp(-kappa * a);
+
+    double dx = (4 * a) / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -2 * a + i * dx;
+        double psi;
+        if (fabs(x) <= a) {
+            psi = A * sin(k * x);
+        }
+        else {
+            psi = B * exp(-kappa * fabs(x));
+        }
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+
+
+double QuantumParticle::computeFiniteSquareWellNormalization(
+    double V0,
+    double energy,
+    int numX)
+{
+    const double hbar = 1.0545718e-34;
+    double a = this->length / 2.0;
+    double m = this->mass;
+
+    double k = sqrt(2.0 * m * (energy + V0)) / hbar;
+    double kappa = sqrt(-2.0 * m * energy) / hbar;
+
+    double A = 1.0;
+    double B = A * sin(k * a) / exp(-kappa * a);
+
+    double dx = (4 * a) / numX;
+    double normIntegral = 0.0;
+
+    for (int i = 0; i < numX; ++i) {
+        double x = -2 * a + i * dx;
+        double psi;
+        if (fabs(x) <= a) {
+            psi = A * sin(k * x);
+        }
+        else {
+            psi = B * exp(-kappa * fabs(x));
+        }
+        normIntegral += psi * psi * dx;
+    }
+
+    return 1.0 / sqrt(normIntegral);
+}
+
+void QuantumParticle::exportFiniteSquareWellTimeEvolutionCSV(
+    const std::string& filename,
+    double V0,
+    double energy,
+    int numPoints,
+    int numTimeSteps,
+    double dt)
+{
+    // For now, just create an empty CSV file as a placeholder.
+    std::ofstream out(filename);
+    out << "x,t,psi\n";
+    out.close();
+}
+// Compute the normalized Coulomb radial wavefunction (simplified)
+double QuantumParticle::computeCoulombRadialWavefunction(int n, double r, double Z) {
+    const double a0 = 5.29177210903e-11; // Bohr radius in meters
+
+    // rho = 2Zr / (n a0)
+    double rho = (2.0 * Z * r) / (n * a0);
+
+    // Normalization constant (approximate for s-states)
+    double norm = sqrt((2.0 * Z / (n * a0)) * (2.0 * Z / (n * a0)) * (2.0 * Z / (n * a0)));
+
+    // Exponential decay
+    double exponential = exp(-rho / 2.0);
+
+    return norm * exponential; // This is a simplified s-wave radial part
+}
+
+// Export the radial wavefunction over [0, rMax]
+void QuantumParticle::exportCoulombWavefunctionCSV(
+    const std::string& filename,
+    int n,
+    double Z,
+    int numPoints
+) {
+    std::ofstream out(filename);
+    out << "r,psi\n";
+
+    double rMax = 5e-10; // 0.5 nm
+    double dr = rMax / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double r = i * dr;
+        double psi = computeCoulombRadialWavefunction(n, r, Z);
+        out << r << "," << psi << "\n";
+    }
+
+    out.close();
+}
+
+
+

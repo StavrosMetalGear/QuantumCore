@@ -35,7 +35,23 @@ public:
     // Coulomb potential
     double computeCoulombEnergy(int n, double Z);
     void exportCoulombWavefunctionCSV(const std::string& filename, int n, double Z, int numPoints);
+    void exportFiniteSquareWellTimeEvolutionCSV(const std::string& filename,
+        double V0,
+        double energy,
+        int numX,
+        int numT,
+        double timeStep);
+    double computeFiniteSquareWellNormalization(double V0, double energy, int numX);
+    // Compute Coulomb (Hydrogen-like) radial wavefunction at r
+    double computeCoulombRadialWavefunction(int n, double r, double Z);
+
+    // Export the radial wavefunction to CSV
+    void exportCoulombWavefunctionCSV(const std::string& filename, int n, double Z, int numPoints);
+
 };
+
+
+
 
 
 

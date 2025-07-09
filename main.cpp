@@ -45,6 +45,17 @@ int main() {
         double energy = particle.computeGroundStateEnergyFiniteSquareWell(V0, 50);
         std::cout << "Ground state energy: " << energy << " J\n";
         particle.exportFiniteSquareWellWavefunctionCSV("finite_well_wavefunction.csv", V0, energy, 100);
+        particle.exportFiniteSquareWellTimeEvolutionCSV(
+            "finite_well_time_evolution.csv",
+            V0,
+            energy,
+            100,    // numX
+            50,     // numT
+            1e-15   // time step in seconds
+        );
+
+        std::cout << "Time evolution saved to finite_well_time_evolution.csv\n";
+
     }
     else if (choice == 4) {
         int n;
@@ -57,6 +68,7 @@ int main() {
         double energy = particle.computeCoulombEnergy(n, Z);
         std::cout << "Energy: " << energy << " J\n";
         particle.exportCoulombWavefunctionCSV("coulomb_wavefunction.csv", n, Z, 100);
+        std::cout << "Wavefunction saved to coulomb_wavefunction.csv\n";
     }
 
     return 0;
