@@ -12,6 +12,7 @@ int main() {
     std::cout << "2 - Harmonic Oscillator\n";
     std::cout << "3 - Finite Square Well\n";
     std::cout << "4 - Coulomb Potential\n";
+    std::cout << "5 - Delta Potential Well\n";
 
     int choice;
     std::cin >> choice;
@@ -69,6 +70,19 @@ int main() {
         std::cout << "Energy: " << energy << " J\n";
         particle.exportCoulombWavefunctionCSV("coulomb_wavefunction.csv", n, Z, 100);
         std::cout << "Wavefunction saved to coulomb_wavefunction.csv\n";
+        particle.exportCoulombTimeEvolutionCSV("coulomb_time.csv", n, Z, 50, 50, 1e-15);
+        std::cout << "Time-dependent wavefunction saved to coulomb_time.csv\n";
+    }
+    else if (choice == 5) {
+        double V0;
+        std::cout << "Enter delta potential strength V0 (J·m): ";
+        std::cin >> V0;
+
+        double energy = particle.computeDeltaPotentialEnergy(V0);
+        std::cout << "Bound state energy: " << energy << " J\n";
+
+        particle.exportDeltaPotentialWavefunctionCSV("delta_wavefunction.csv", V0, 200);
+        std::cout << "Wavefunction saved to delta_wavefunction.csv\n";
     }
 
     return 0;

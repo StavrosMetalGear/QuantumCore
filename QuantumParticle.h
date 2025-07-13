@@ -34,7 +34,7 @@ public:
 
     // Coulomb potential
     double computeCoulombEnergy(int n, double Z);
-    void exportCoulombWavefunctionCSV(const std::string& filename, int n, double Z, int numPoints);
+
     void exportFiniteSquareWellTimeEvolutionCSV(const std::string& filename,
         double V0,
         double energy,
@@ -47,7 +47,20 @@ public:
 
     // Export the radial wavefunction to CSV
     void exportCoulombWavefunctionCSV(const std::string& filename, int n, double Z, int numPoints);
+    void exportCoulombTimeEvolutionCSV(
+        const std::string& filename,
+        int n,
+        double Z,
+        int numR,
+        int numT,
+        double tMax);
+    double computeDeltaPotentialEnergy(double V0);
+    void exportDeltaPotentialWavefunctionCSV(const std::string& filename, double V0, int numPoints);
+    // Delta potential energy (1 bound state)
 
+}
+    double computeDeltaPotentialWavefunction(int n, double x, double V0);
+    void exportDeltaPotentialTimeEvolutionCSV(const std::string& filename, double V0, int numPoints, double tMax);
 };
 
 

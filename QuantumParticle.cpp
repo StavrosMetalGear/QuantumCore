@@ -157,26 +157,7 @@ double QuantumParticle::computeCoulombEnergy(int n, double Z) {
     return prefactor / (n * n);
 }
 
-void QuantumParticle::exportCoulombWavefunctionCSV(
-    const std::string& filename,
-    int n,
-    double Z,
-    int numPoints)
-{
-    std::ofstream out(filename);
-    out << "r,psi\n";
 
-    double rMax = 1e-9;
-    double dr = rMax / numPoints;
-    double lambda = Z / n;
-
-    for (int i = 0; i < numPoints; ++i) {
-        double r = dr * i;
-        double psi = exp(-lambda * r);
-        out << r << "," << psi << "\n";
-    }
-    out.close();
-}
 void QuantumParticle::exportFiniteSquareWellWavefunctionCSV(
     const std::string& filename,
     double V0,
@@ -296,6 +277,81 @@ void QuantumParticle::exportCoulombWavefunctionCSV(
         double r = i * dr;
         double psi = computeCoulombRadialWavefunction(n, r, Z);
         out << r << "," << psi << "\n";
+    }
+
+    out.close();
+}
+void QuantumParticle::exportCoulombTimeEvolutionCSV(
+    const std::string& filename,
+    int n,
+    double Z,
+    int numR,
+    int numT,
+    double tMax)
+{
+    std::ofstream out(filename);
+    out << "r,t,RePsi,ImPsi,AbsPsi,Phase\n";
+
+    const double hbar = 1.0545718e-34;
+    const double e = 1.602176634e-19;
+    const double epsilon0 = 8.854187817e-12;
+
+    // Simplified energy
+    double energy = computeCoulombEnergy(n, Z);
+
+    double rMax = 1e-9;
+    double dr = rMax / numR;
+    double dt = tMax / numT;
+
+    for (int tStep = 0; tStep < numT; ++tStep) {
+        double t = tStep * dt;
+
+        for (int i = 0; i < numR; ++i) {
+            double r = i * dr;
+            double R = exp(-Z * r / n); // approximate radial decay
+
+            std::complex<double> phase = std::exp(std::complex<double>(0, -energy * t / hbar));
+            std::complex<double> psi = R * phase;
+
+            out << r << "," << t << ","
+                << psi.real() << ","
+                << psi.imag() << ","
+                << std::abs(psi) << ","
+                << std::arg(psi) << "\n";
+        }
+    }
+
+    out.close();
+}
+
+// Delta potential energy (1 bound state)
+double QuantumParticle::computeDeltaPotentialEnergy(double V0) {
+    const double hbar = 1.0545718e-34;
+    double kappa = mass * V0 / (hbar * hbar);
+    return -(hbar * hbar * kappa * kappa) / (2 * mass);
+}
+
+// Export wavefunction as CSV
+void QuantumParticle::exportDeltaPotentialWavefunctionCSV(
+    const std::string& filename,
+    double V0,
+    int numPoints)
+{
+    const double hbar = 1.0545718e-34;
+    double kappa = mass * V0 / (hbar * hbar);
+
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMax = 1e-9;
+    double dx = 2 * xMax / numPoints;
+
+    double norm = sqrt(kappa);
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -xMax + i * dx;
+        double psi = norm * exp(-kappa * fabs(x));
+        out << x << "," << psi << "\n";
     }
 
     out.close();
