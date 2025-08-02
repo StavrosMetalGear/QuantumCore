@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <complex>
+#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
@@ -356,6 +357,199 @@ void QuantumParticle::exportDeltaPotentialWavefunctionCSV(
 
     out.close();
 }
+// Approximate energy (ground state only) for double delta
+double QuantumParticle::computeDoubleDeltaEnergy(double V0, double a) {
+    const double hbar = 1.0545718e-34;
+    double kappa = mass * V0 / (hbar * hbar);
+    double E = -(hbar * hbar * kappa * kappa) / (2.0 * mass);
+    return E;  // Simplified approximation for symmetric bound state
+}
+
+// Export double delta wavefunction
+void QuantumParticle::exportDoubleDeltaWavefunctionCSV(
+    const std::string& filename,
+    double V0,
+    double a,
+    int numPoints)
+{
+    const double hbar = 1.0545718e-34;
+    double kappa = mass * V0 / (hbar * hbar);
+
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMax = 2e-9;
+    double dx = 2 * xMax / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -xMax + i * dx;
+
+        // Symmetric wavefunction approximation
+        double psi = exp(-kappa * fabs(x - a)) + exp(-kappa * fabs(x + a));
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+void QuantumParticle::exportStepPotentialWavefunctionCSV(
+    const std::string& filename,
+    double E,    // particle energy
+    double V0,   // step height
+    int numPoints)
+{
+    const double hbar = 1.0545718e-34;
+    double m = mass;
+
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMin = -2e-9;
+    double xMax = 2e-9;
+    double dx = (xMax - xMin) / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = xMin + i * dx;
+        double psi;
+
+        if (x < 0) {
+            // Free wave: A * exp(i k x)
+            double k = sqrt(2.0 * m * E) / hbar;
+            psi = cos(k * x);  // Real part of wave
+        }
+        else {
+            if (E > V0) {
+                double k2 = sqrt(2.0 * m * (E - V0)) / hbar;
+                psi = cos(k2 * x);  // transmitted wave
+            }
+            else {
+                double kappa = sqrt(2.0 * m * (V0 - E)) / hbar;
+                psi = exp(-kappa * x);  // decaying exponential (tunneling)
+            }
+        }
+
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+void QuantumParticle::exportBarrierWavefunctionCSV(
+    const std::string& filename,
+    double E,
+    double V0,
+    double a,
+    int numPoints)
+{
+    const double hbar = 1.0545718e-34;
+    double m = mass;
+
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMin = -3 * a;
+    double xMax = 3 * a;
+    double dx = (xMax - xMin) / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = xMin + i * dx;
+        double psi;
+
+        if (x < -a) {
+            double k = sqrt(2 * m * E) / hbar;
+            psi = cos(k * x); // incident wave
+        }
+        else if (x >= -a && x <= a) {
+            if (E > V0) {
+                double k_bar = sqrt(2 * m * (E - V0)) / hbar;
+                psi = cos(k_bar * x); // inside barrier
+            }
+            else {
+                double kappa = sqrt(2 * m * (V0 - E)) / hbar;
+                psi = exp(-kappa * fabs(x)); // tunneling (evanescent wave)
+            }
+        }
+        else {
+            double k = sqrt(2 * m * E) / hbar;
+            psi = cos(k * x); // transmitted wave
+        }
+
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+void QuantumParticle::exportTriangularWellWavefunctionCSV(
+    const std::string& filename,
+    double F,
+    double energy,
+    int numPoints)
+{
+    const double hbar = 1.0545718e-34;
+    double m = mass;
+
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMax = 5e-9; // 5 nm
+    double dx = xMax / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = i * dx;
+        double Vx = F * x;
+        double argument = energy - Vx;
+        double k = (argument > 0) ? sqrt(2 * m * argument) / hbar : 0.0;
+
+        //double k = sqrt(2 * m * std::max(energy - Vx, 0.0)) / hbar;
+
+        double psi = (energy > Vx) ? sin(k * x) : exp(-x);  // placeholder behavior
+
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+double QuantumParticle::computeParabolicWellEnergy(int n, double omega) {
+    const double hbar = 1.0545718e-34;
+    return hbar * omega * (n + 0.5);
+}
+
+double QuantumParticle::computeParabolicWellWavefunction(int n, double x, double omega) {
+    const double hbar = 1.0545718e-34;
+    double alpha = mass * omega / hbar;
+
+    double normalization = pow(alpha / M_PI, 0.25) / sqrt(pow(2.0, n) * tgamma(n + 1));
+
+    double hermite;
+    if (n == 0) {
+        hermite = 1.0;
+    }
+    else if (n == 1) {
+        hermite = 2.0 * sqrt(alpha) * x;
+    }
+    else {
+        hermite = 0.0; // Placeholder – you can later implement general Hermite recursion
+    }
+
+    double gaussian = exp(-0.5 * alpha * x * x);
+    return normalization * hermite * gaussian;
+}
+
+void QuantumParticle::exportParabolicWellWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints) {
+    std::ofstream out(filename);
+    out << "x,psi\n";
+
+    double xMax = 1e-9;
+    double dx = 2 * xMax / numPoints;
+
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -xMax + i * dx;
+        double psi = computeParabolicWellWavefunction(n, x, omega);
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+
+
 
 
 

@@ -58,9 +58,19 @@ public:
     void exportDeltaPotentialWavefunctionCSV(const std::string& filename, double V0, int numPoints);
     // Delta potential energy (1 bound state)
 
-}
+
     double computeDeltaPotentialWavefunction(int n, double x, double V0);
     void exportDeltaPotentialTimeEvolutionCSV(const std::string& filename, double V0, int numPoints, double tMax);
+    double computeDoubleDeltaEnergy(double V0, double a);
+    void exportDoubleDeltaWavefunctionCSV(const std::string& filename, double V0, double a, int numPoints);
+    void exportStepPotentialWavefunctionCSV(const std::string& filename, double E, double V0, int numPoints);
+    void exportBarrierWavefunctionCSV(const std::string& filename, double E, double V0, double a, int numPoints);
+    void exportTriangularWellWavefunctionCSV(const std::string& filename, double F, double energy, int numPoints);
+    // Parabolic potential (treated similar to harmonic oscillator)
+    double computeParabolicWellEnergy(int n, double omega);
+    double computeParabolicWellWavefunction(int n, double x, double omega);
+    void exportParabolicWellWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints);
+
 };
 
 

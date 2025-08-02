@@ -13,6 +13,13 @@ int main() {
     std::cout << "3 - Finite Square Well\n";
     std::cout << "4 - Coulomb Potential\n";
     std::cout << "5 - Delta Potential Well\n";
+    std::cout << "6 - Double Delta Potential Well\n";
+    std::cout << "7 - Step Potential\n";
+    std::cout << "8 - Square Potential Barrier\n";
+    std::cout << "9 - Triangular Well Potential\n";
+    std::cout << "10 - Parabolic Well\n";
+
+
 
     int choice;
     std::cin >> choice;
@@ -84,6 +91,66 @@ int main() {
         particle.exportDeltaPotentialWavefunctionCSV("delta_wavefunction.csv", V0, 200);
         std::cout << "Wavefunction saved to delta_wavefunction.csv\n";
     }
+    else if (choice == 6) {
+        double V0, a;
+        std::cout << "Enter potential strength V0 (J·m): ";
+        std::cin >> V0;
+        std::cout << "Enter well separation distance a (m): ";
+        std::cin >> a;
+
+        double energy = particle.computeDoubleDeltaEnergy(V0, a);
+        std::cout << "Estimated energy: " << energy << " J\n";
+
+        particle.exportDoubleDeltaWavefunctionCSV("double_delta_wavefunction.csv", V0, a, 200);
+        std::cout << "Wavefunction saved to double_delta_wavefunction.csv\n";
+    }
+    else if (choice == 7) {
+        double E, V0;
+        std::cout << "Enter particle energy E (J): ";
+        std::cin >> E;
+        std::cout << "Enter step height V0 (J): ";
+        std::cin >> V0;
+
+        particle.exportStepPotentialWavefunctionCSV("step_potential_wavefunction.csv", E, V0, 200);
+        std::cout << "Wavefunction saved to step_potential_wavefunction.csv\n";
+    }
+    else if (choice == 8) {
+        double E, V0, a;
+        std::cout << "Enter particle energy E (J): ";
+        std::cin >> E;
+        std::cout << "Enter barrier height V0 (J): ";
+        std::cin >> V0;
+        std::cout << "Enter half-width a (m): ";
+        std::cin >> a;
+
+        particle.exportBarrierWavefunctionCSV("barrier_wavefunction.csv", E, V0, a, 300);
+        std::cout << "Wavefunction saved to barrier_wavefunction.csv\n";
+    }
+    else if (choice == 9) {
+        double F, energy;
+        std::cout << "Enter electric field F (N/C or J/m): ";
+        std::cin >> F;
+        std::cout << "Enter energy level (J): ";
+        std::cin >> energy;
+
+        particle.exportTriangularWellWavefunctionCSV("triangular_well.csv", F, energy, 300);
+        std::cout << "Wavefunction saved to triangular_well.csv\n";
+        }
+    else if (choice == 10) {
+        int n;
+        std::cout << "Enter energy level n: ";
+        std::cin >> n;
+        double omega;
+        std::cout << "Enter angular frequency omega (rad/s): ";
+        std::cin >> omega;
+
+        double energy = particle.computeParabolicWellEnergy(n, omega);
+        std::cout << "Energy: " << energy << " J\n";
+
+        particle.exportParabolicWellWavefunctionCSV("parabolic_well_wavefunction.csv", n, omega, 100);
+        std::cout << "Wavefunction saved to parabolic_well_wavefunction.csv\n";
+        }
+
 
     return 0;
 }
