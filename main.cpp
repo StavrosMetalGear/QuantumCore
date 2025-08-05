@@ -1,7 +1,7 @@
 ﻿#include "pch.h"
 #include <iostream>
 #include "QuantumParticle.h"
-
+#include "NumericalSolver.h"
 int main() {
     std::cout << "Quantum Mechanics Simulation (QuantumCore)\n";
 
@@ -149,6 +149,38 @@ int main() {
 
         particle.exportParabolicWellWavefunctionCSV("parabolic_well_wavefunction.csv", n, omega, 100);
         std::cout << "Wavefunction saved to parabolic_well_wavefunction.csv\n";
+        }
+    else if (choice == 11) {
+        int numPoints, numEigenstates;
+        double xMin, xMax;
+        std::cout << "Enter xMin: ";
+        std::cin >> xMin;
+        std::cout << "Enter xMax: ";
+        std::cin >> xMax;
+        std::cout << "Enter number of points: ";
+        std::cin >> numPoints;
+        std::cout << "Enter number of eigenstates to compute: ";
+        std::cin >> numEigenstates;
+
+        std::vector<double> V(numPoints);
+        double dx = (xMax - xMin) / (numPoints - 1);
+        for (int i = 0; i < numPoints; ++i) {
+            double x = xMin + i * dx;
+            // Example: harmonic oscillator V(x) = 0.5 * m * omega^2 * x^2
+            V[i] = 0.5 * particle.mass * pow(1e15, 2) * x * x;  // omega = 1e15 rad/s
+        }
+
+        NumericalSolver::solveSchrodingerFDM(
+            particle.mass,
+            xMin,
+            xMax,
+            numPoints,
+            V,
+            numEigenstates,
+            "fdm_output.csv"
+        );
+
+        std::cout << "FDM results saved to fdm_output.csv\n";
         }
 
 
