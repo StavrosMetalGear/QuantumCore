@@ -35,6 +35,21 @@ void NumericalSolver::solveSchrodingerFDM(
     VectorXd eigenvalues = solver.eigenvalues();
     MatrixXd eigenvectors = solver.eigenvectors();
 
+    // --- Normalize eigenvectors and export energies (quick polish) ---
+    for (int i = 0; i < numEigenstates; ++i) {
+        double norm = eigenvectors.col(i).norm();
+        if (norm > 0.0) eigenvectors.col(i) /= norm;
+    }
+
+    // Save energies to a separate CSV
+    {
+        std::ofstream eout("fdm_energies.csv");
+        eout << "index,energy_J\n";
+        for (int i = 0; i < numEigenstates; ++i)
+            eout << i << "," << eigenvalues(i) << "\n";
+    }
+
+
     // Save results
     std::ofstream out(outputFilename);
     out << "x";

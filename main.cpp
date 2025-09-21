@@ -2,6 +2,7 @@
 #include <iostream>
 #include "QuantumParticle.h"
 #include "NumericalSolver.h"
+#include <algorithm>
 int main() {
     std::cout << "Quantum Mechanics Simulation (QuantumCore)\n";
 
@@ -150,38 +151,92 @@ int main() {
         particle.exportParabolicWellWavefunctionCSV("parabolic_well_wavefunction.csv", n, omega, 100);
         std::cout << "Wavefunction saved to parabolic_well_wavefunction.csv\n";
         }
+#include <algorithm> // if you need std::max elsewhere
+
     else if (choice == 11) {
         int numPoints, numEigenstates;
         double xMin, xMax;
-        std::cout << "Enter xMin: ";
-        std::cin >> xMin;
-        std::cout << "Enter xMax: ";
-        std::cin >> xMax;
-        std::cout << "Enter number of points: ";
-        std::cin >> numPoints;
-        std::cout << "Enter number of eigenstates to compute: ";
-        std::cin >> numEigenstates;
+        std::cout << "Enter xMin: "; std::cin >> xMin;
+        std::cout << "Enter xMax: "; std::cin >> xMax;
+        std::cout << "Enter number of grid points: "; std::cin >> numPoints;
+        std::cout << "How many eigenstates to compute? "; std::cin >> numEigenstates;
+
+        std::cout << "\nChoose numeric potential:\n"
+            << " 1) Finite well (depth V0, half-width a)\n"
+            << " 2) Double well (depth V0, centers +/-d, width w)\n"
+            << " 3) Gaussian well (V0 * exp(-(x/sigma)^2))\n"
+            << " 4) Quartic (lambda * x^4)\n"
+            << " 5) Harmonic (0.5 * m * omega^2 * x^2)\n"
+            << "Select: ";
+        int p; std::cin >> p;
 
         std::vector<double> V(numPoints);
         double dx = (xMax - xMin) / (numPoints - 1);
-        for (int i = 0; i < numPoints; ++i) {
-            double x = xMin + i * dx;
-            // Example: harmonic oscillator V(x) = 0.5 * m * omega^2 * x^2
-            V[i] = 0.5 * particle.mass * pow(1e15, 2) * x * x;  // omega = 1e15 rad/s
+
+        if (p == 1) {
+            double V0, a;
+            std::cout << "V0 (J): "; std::cin >> V0;
+            std::cout << "a (m): ";  std::cin >> a;
+            for (int i = 0; i < numPoints; ++i) {
+                double x = xMin + i * dx;
+                V[i] = (std::abs(x) <= a) ? 0.0 : V0;
+            }
+        }
+        else if (p == 2) {
+            double V0, d, w;
+            std::cout << "V0 (J): "; std::cin >> V0;
+            std::cout << "d (m): ";  std::cin >> d;
+            std::cout << "w (m): ";  std::cin >> w;
+            for (int i = 0; i < numPoints; ++i) {
+                double x = xMin + i * dx;
+                // two square wells centered at ±d of half-width w/2
+                bool inLeft = (x >= -d - w / 2.0) && (x <= -d + w / 2.0);
+                bool inRight = (x >= d - w / 2.0) && (x <= d + w / 2.0);
+                V[i] = (inLeft || inRight) ? 0.0 : V0;
+            }
+        }
+        else if (p == 3) {
+            double V0, sigma;
+            std::cout << "V0 (J, negative for well): "; std::cin >> V0;
+            std::cout << "sigma (m): "; std::cin >> sigma;
+            for (int i = 0; i < numPoints; ++i) {
+                double x = xMin + i * dx;
+                V[i] = V0 * std::exp(-(x * x) / (sigma * sigma));
+            }
+        }
+        else if (p == 4) {
+            double lambda;
+            std::cout << "lambda (J/m^4): "; std::cin >> lambda;
+            for (int i = 0; i < numPoints; ++i) {
+                double x = xMin + i * dx;
+                V[i] = lambda * x * x * x * x;
+            }
+        }
+        else if (p == 5) {
+            double omega;
+            std::cout << "omega (rad/s): "; std::cin >> omega;
+            for (int i = 0; i < numPoints; ++i) {
+                double x = xMin + i * dx;
+                V[i] = 0.5 * particle.mass * omega * omega * x * x;
+            }
+        }
+        else {
+            std::cout << "Unknown preset; using zero potential.\n";
+            std::fill(V.begin(), V.end(), 0.0);
         }
 
         NumericalSolver::solveSchrodingerFDM(
             particle.mass,
-            xMin,
-            xMax,
+            xMin, xMax,
             numPoints,
             V,
             numEigenstates,
             "fdm_output.csv"
         );
 
-        std::cout << "FDM results saved to fdm_output.csv\n";
+        std::cout << "Wrote eigenfunctions to fdm_output.csv and energies to fdm_energies.csv\n";
         }
+
 
 
     return 0;
