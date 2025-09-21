@@ -3,6 +3,7 @@
 #include "QuantumParticle.h"
 #include "NumericalSolver.h"
 #include <algorithm>
+
 int main() {
     std::cout << "Quantum Mechanics Simulation (QuantumCore)\n";
 
@@ -236,6 +237,58 @@ int main() {
 
         std::cout << "Wrote eigenfunctions to fdm_output.csv and energies to fdm_energies.csv\n";
         }
+
+    else if (choice == 12) {
+            // Grid/setup
+            double xMin, xMax;
+            int N, snapshots, steps;
+            double dt;
+
+            std::cout << "Crank–Nicolson time evolution\n";
+            std::cout << "xMin: "; std::cin >> xMin;
+            std::cout << "xMax: "; std::cin >> xMax;
+            std::cout << "Grid points N: "; std::cin >> N;
+            std::cout << "Time step dt (s): "; std::cin >> dt;
+            std::cout << "Number of steps: "; std::cin >> steps;
+            std::cout << "Snapshot every K steps: "; std::cin >> snapshots;
+
+            // Build a potential: finite well (depth V0) inside |x|<=a, otherwise 0
+            double V0, a;
+            std::cout << "Finite well parameters: V0 (J, negative for well), a (m half-width)\n";
+            std::cout << "V0: "; std::cin >> V0;
+            std::cout << "a:  "; std::cin >> a;
+
+            std::vector<double> V(N);
+            double dx = (xMax - xMin) / (N - 1);
+            for (int i = 0; i < N; ++i) {
+                double x = xMin + i * dx;
+                V[i] = (std::abs(x) <= a) ? V0 : 0.0;
+            }
+
+            // Initial state: Gaussian packet
+            double x0, sigma, k0;
+            std::cout << "Gaussian packet: center x0, width sigma, momentum k0 (1/m)\n";
+            std::cout << "x0: ";    std::cin >> x0;
+            std::cout << "sigma: "; std::cin >> sigma;
+            std::cout << "k0: ";    std::cin >> k0;
+
+            double mass = 9.11e-31; // electron by default, or particle.mass if you have one
+            auto psi0 = NumericalSolver::makeGaussianInitial(N, xMin, xMax, x0, sigma, k0);
+
+            NumericalSolver::timeEvolveCrankNicolson(
+                mass,
+                xMin, xMax,
+                N,
+                V,
+                psi0,
+                dt,
+                steps,
+                "cn_time.csv",
+                snapshots
+            );
+
+            std::cout << "Time evolution snapshots written to cn_time.csv\n";
+            }
 
 
 
