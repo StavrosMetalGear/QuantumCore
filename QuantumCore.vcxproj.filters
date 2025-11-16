@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="QuantumCore Python">
+      <UniqueIdentifier>{515233ac-a585-4994-999d-41e277424981}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -971,5 +974,13 @@
     <ClCompile Include="NumericalSolver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="animate_time.py">
+      <Filter>QuantumCore Python</Filter>
+    </None>
+    <None Include="plot_eigen.py">
+      <Filter>QuantumCore Python</Filter>
+    </None>
   </ItemGroup>
 </Project>

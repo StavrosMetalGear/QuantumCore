@@ -461,6 +461,10 @@
     <ClCompile Include="QuantumParticle.cpp" />
     <ClCompile Include="Solver.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="animate_time.py" />
+    <None Include="plot_eigen.py" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

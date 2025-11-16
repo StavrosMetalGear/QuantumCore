@@ -20,6 +20,8 @@ int main() {
     std::cout << "8 - Square Potential Barrier\n";
     std::cout << "9 - Triangular Well Potential\n";
     std::cout << "10 - Parabolic Well\n";
+    std::cout << "11 - Numerical Solver (Finite Difference Method)\n";
+    std::cout << "12 - Time Evolution (Crank–Nicolson)\n";
 
 
 
