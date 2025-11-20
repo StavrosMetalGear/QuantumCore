@@ -171,10 +171,14 @@ int main() {
             << " 4) Quartic (lambda * x^4)\n"
             << " 5) Harmonic (0.5 * m * omega^2 * x^2)\n"
             << "Select: ";
-        int p; std::cin >> p;
+        int p;
+        std::cin >> p;
 
         std::vector<double> V(numPoints);
         double dx = (xMax - xMin) / (numPoints - 1);
+
+        // ------------------ BUILD POTENTIAL ------------------
+        double omega = 0.0;   // θα το χρειαστούμε αν p == 5
 
         if (p == 1) {
             double V0, a;
@@ -214,9 +218,9 @@ int main() {
                 V[i] = lambda * x * x * x * x;
             }
         }
-        else if (p == 5) {
-            double omega;
-            std::cout << "omega (rad/s): "; std::cin >> omega;
+        else if (p == 5) {   // ⭐ Harmonic oscillator ⭐
+            std::cout << "omega (rad/s): ";
+            std::cin >> omega;
             for (int i = 0; i < numPoints; ++i) {
                 double x = xMin + i * dx;
                 V[i] = 0.5 * particle.mass * omega * omega * x * x;
@@ -227,6 +231,7 @@ int main() {
             std::fill(V.begin(), V.end(), 0.0);
         }
 
+        // ------------------ RUN FDM SOLVER ------------------
         NumericalSolver solver;
         solver.solveSchrodingerFDM(
             particle.mass,
@@ -238,7 +243,19 @@ int main() {
         );
 
         std::cout << "Wrote eigenfunctions to fdm_output.csv and energies to fdm_energies.csv\n";
+
+        // ------------------ ANALYTIC HO COMPARISON ------------------
+        if (p == 5) {
+            std::cout << "\nAnalytic harmonic oscillator energies (same m, omega):\n";
+            for (int n = 0; n < numEigenstates; ++n) {
+                double E_analytic = particle.computeEnergy1DHarmonicOscillator(n, omega);
+                std::cout << "n = " << n
+                    << "  E_analytic = " << E_analytic << " J\n";
+            }
+            std::cout << "----------------------------------------\n";
         }
+        }
+
 
 
     else if (choice == 12) {
