@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+﻿/*#include "pch.h"
 #include "Solver.h"
 #include <fstream>
 #include <complex>
@@ -61,4 +61,4 @@ void simulate_wavefunction(double L, double mass, int numStates, const std::vect
     out.close();
 }
 
-
+*/

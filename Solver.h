@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 #include <vector>
 #include <complex>
 
@@ -7,3 +7,4 @@ double SolveSchrodinger(double mass, double length, double potential);
 
 // Simulates the time-dependent wavefunction in the 1D infinite potential well
 void simulate_wavefunction(double L, double mass, int numStates, const std::vector<std::complex<double>>& coefficients);
+*/
