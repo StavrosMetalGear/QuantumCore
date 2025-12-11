@@ -77,7 +77,8 @@ void QuantumParticle::exportWavefunctionCSV(const std::string& filename, int n, 
 
 // Harmonic oscillator
 double QuantumParticle::computeEnergy1DHarmonicOscillator(int n, double omega) {
-    const double hbar = 1.0545718e-34;
+    //const double hbar = 1.0545718e-34;
+    const double hbar = 1.0;
     return hbar * omega * (n + 0.5);
 }
 

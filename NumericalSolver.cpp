@@ -17,7 +17,12 @@ void NumericalSolver::solveSchrodingerFDM(
     const std::string& outputFilename)
 {
     using namespace Eigen;
-    const double hbar = 1.0545718e-34;
+    //const double hbar = 1.0545718e-34;
+    // NEW: dimensionless units
+    const double hbar = 1.0;
+    // treat "mass" argument as dimensionless too (pass 1.0 from main)
+    double m = mass;
+
     double dx = (xMax - xMin) / (numPoints - 1);
 
     MatrixXd H = MatrixXd::Zero(numPoints, numPoints);

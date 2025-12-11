@@ -223,7 +223,10 @@ int main() {
             std::cin >> omega;
             for (int i = 0; i < numPoints; ++i) {
                 double x = xMin + i * dx;
-                V[i] = 0.5 * particle.mass * omega * omega * x * x;
+                //V[i] = 0.5 * particle.mass * omega * omega * x * x;
+                // Here "omega" is just a dimensionless frequency parameter.
+                V[i] = 0.5 * omega * omega * x * x;
+
             }
         }
         else {
@@ -234,7 +237,8 @@ int main() {
         // ------------------ RUN FDM SOLVER ------------------
         NumericalSolver solver;
         solver.solveSchrodingerFDM(
-            particle.mass,
+            //particle.mass
+            1,
             xMin, xMax,
             numPoints,
             V,
