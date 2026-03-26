@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <complex>
+#include <utility>
 
 class QuantumParticle {
 public:
@@ -70,6 +71,11 @@ public:
     double computeParabolicWellEnergy(int n, double omega);
     double computeParabolicWellWavefunction(int n, double x, double omega);
     void exportParabolicWellWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints);
+
+    // Scattering coefficients (R, T)
+    std::pair<double, double> computeStepPotentialRT(double E, double V1, double V2, double mI, double mII);
+    std::pair<double, double> computeDeltaScatteringRT(double E, double b);
+    std::pair<double, double> computeBarrierRT(double E, double V0, double a);
 
 };
 

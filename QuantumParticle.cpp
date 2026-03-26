@@ -552,6 +552,89 @@ void QuantumParticle::exportParabolicWellWavefunctionCSV(const std::string& file
     out.close();
 }
 
+// ============================================================
+// Scattering coefficients
+// ============================================================
+
+// Potential step: V1 for x<0, V2 for x>0, with masses mI and mII
+std::pair<double, double> QuantumParticle::computeStepPotentialRT(
+    double E, double V1, double V2, double mI, double mII)
+{
+    const double hbar = 1.0545718e-34;
+
+    if (E <= V1) {
+        return { 1.0, 0.0 };
+    }
+
+    double kI = sqrt(2.0 * mI * (E - V1)) / hbar;
+
+    if (E <= V2) {
+        // Evanescent region II: total reflection
+        return { 1.0, 0.0 };
+    }
+
+    double kII = sqrt(2.0 * mII * (E - V2)) / hbar;
+
+    double num_R = (kI * mII - kII * mI);
+    double den   = (kI * mII + kII * mI);
+    double R = (num_R * num_R) / (den * den);
+    double T = (4.0 * kI * kII * mI * mII) / (den * den);
+
+    return { R, T };
+}
+
+// Delta potential scattering: V(x) = b * delta(x), b > 0
+std::pair<double, double> QuantumParticle::computeDeltaScatteringRT(
+    double E, double b)
+{
+    const double hbar = 1.0545718e-34;
+
+    if (E <= 0.0) {
+        return { 1.0, 0.0 };
+    }
+
+    double k = sqrt(2.0 * mass * E) / hbar;
+    double beta = 2.0 * mass * b / (hbar * hbar);
+
+    double T = (4.0 * k * k) / (4.0 * k * k + beta * beta);
+    double R = (beta * beta) / (4.0 * k * k + beta * beta);
+
+    return { R, T };
+}
+
+// Rectangular barrier: V0 for |x| <= a, 0 otherwise
+std::pair<double, double> QuantumParticle::computeBarrierRT(
+    double E, double V0, double a)
+{
+    const double hbar = 1.0545718e-34;
+
+    if (E <= 0.0) {
+        return { 1.0, 0.0 };
+    }
+
+    double k = sqrt(2.0 * mass * E) / hbar;
+
+    if (E < V0) {
+        // Tunneling regime
+        double gamma = sqrt(2.0 * mass * (V0 - E)) / hbar;
+        double sh = sinh(2.0 * gamma * a);
+        double ratio = (k * k + gamma * gamma) / (2.0 * k * gamma);
+        double T = 1.0 / (1.0 + ratio * ratio * sh * sh);
+        double R = 1.0 - T;
+        return { R, T };
+    }
+    else {
+        // E >= V0: oscillatory regime with possible resonances
+        double kp = sqrt(2.0 * mass * (E - V0)) / hbar;
+        double sn = sin(2.0 * kp * a);
+        double diff = k * k - kp * kp;
+        double denom = 4.0 * k * k * kp * kp;
+        double T = 1.0 / (1.0 + (diff * diff / denom) * sn * sn);
+        double R = 1.0 - T;
+        return { R, T };
+    }
+}
+
 
 
 

@@ -24,6 +24,7 @@ int main() {
     std::cout << "10 - Parabolic Well\n";
     std::cout << "11 - Numerical Solver (Finite Difference Method)\n";
     std::cout << "12 - Time Evolution (Crank–Nicolson)\n";
+    std::cout << "13 - Scattering Coefficients (R, T)\n";
 
 
 
@@ -317,8 +318,67 @@ int main() {
         std::cout << "Time evolution snapshots written to cn_time.csv\n";
         }
 
+    else if (choice == 13) {
+        std::cout << "\nScattering coefficient calculator\n";
+        std::cout << "1 - Potential Step\n";
+        std::cout << "2 - Delta Potential\n";
+        std::cout << "3 - Rectangular Barrier\n";
+        std::cout << "Select: ";
+        int sc;
+        std::cin >> sc;
 
+        if (sc == 1) {
+            double E, V1, V2, mI, mII;
+            std::cout << "Particle energy E (J): "; std::cin >> E;
+            std::cout << "V1 (potential for x<0, J): "; std::cin >> V1;
+            std::cout << "V2 (potential for x>0, J): "; std::cin >> V2;
+            std::cout << "Mass in region I (kg) [0 = electron]: "; std::cin >> mI;
+            if (mI == 0.0) mI = 9.11e-31;
+            std::cout << "Mass in region II (kg) [0 = same as region I]: "; std::cin >> mII;
+            if (mII == 0.0) mII = mI;
 
+            auto [R, T] = particle.computeStepPotentialRT(E, V1, V2, mI, mII);
+            std::cout << "\nReflection coefficient R = " << R << "\n";
+            std::cout << "Transmission coefficient T = " << T << "\n";
+            std::cout << "R + T = " << R + T << "\n";
+        }
+        else if (sc == 2) {
+            double E, b;
+            std::cout << "Particle energy E (J): "; std::cin >> E;
+            std::cout << "Delta strength b (J*m, positive): "; std::cin >> b;
+
+            auto [R, T] = particle.computeDeltaScatteringRT(E, b);
+            std::cout << "\nReflection coefficient R = " << R << "\n";
+            std::cout << "Transmission coefficient T = " << T << "\n";
+            std::cout << "R + T = " << R + T << "\n";
+        }
+        else if (sc == 3) {
+            double E, V0, a;
+            std::cout << "Particle energy E (J): "; std::cin >> E;
+            std::cout << "Barrier height V0 (J): "; std::cin >> V0;
+            std::cout << "Barrier half-width a (m): "; std::cin >> a;
+
+            auto [R, T] = particle.computeBarrierRT(E, V0, a);
+            std::cout << "\nReflection coefficient R = " << R << "\n";
+            std::cout << "Transmission coefficient T = " << T << "\n";
+            std::cout << "R + T = " << R + T << "\n";
+
+            if (E < V0) {
+                std::cout << "(Tunneling regime: E < V0)\n";
+            }
+            else {
+                double hbar = 1.0545718e-34;
+                double kp = sqrt(2.0 * particle.mass * (E - V0)) / hbar;
+                double resonance_cond = 2.0 * kp * a / M_PI;
+                std::cout << "(Oscillatory regime: E > V0)\n";
+                std::cout << "2k'a / pi = " << resonance_cond
+                          << "  (T=1 when this is an integer)\n";
+            }
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
 
     return 0;
 }
