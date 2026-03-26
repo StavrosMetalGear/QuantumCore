@@ -1,0 +1,465 @@
+================================================================================
+                          QuantumCore Documentation
+================================================================================
+
+                            Table of Contents
+
+  1.  Building the Project
+  2.  Running the Application
+  3.  Class Reference: QuantumParticle
+  4.  Class Reference: NumericalSolver
+  5.  Menu Options Reference
+  6.  Output Files
+  7.  Visualization with Python
+  8.  Extending the Project
+
+
+================================================================================
+1.  BUILDING THE PROJECT
+================================================================================
+
+  Prerequisites
+  -------------
+  - Microsoft Visual Studio 2022 or later (C++17 support required).
+  - The Eigen header-only library is bundled in the repository under the
+    Eigen/ directory.  No separate installation is needed.
+  - Python 3.x with pandas, numpy, and matplotlib (only for visualization).
+
+  Build Steps
+  -----------
+  1. Open  QuantumCore.sln  in Visual Studio.
+  2. Select the desired configuration (Debug / Release, x64).
+  3. Build the solution (Ctrl+Shift+B).
+
+  The project uses a precompiled header (pch.h / framework.h).  All .cpp
+  files must include "pch.h" as their first directive.
+
+
+================================================================================
+2.  RUNNING THE APPLICATION
+================================================================================
+
+  Launch the compiled executable from Visual Studio or the command line.
+  The program presents an interactive menu:
+
+    1  - Infinite Square Well
+    2  - Harmonic Oscillator
+    3  - Finite Square Well
+    4  - Coulomb Potential
+    5  - Delta Potential Well
+    6  - Double Delta Potential Well
+    7  - Step Potential
+    8  - Square Potential Barrier
+    9  - Triangular Well Potential
+    10 - Parabolic Well
+    11 - Numerical Solver (Finite Difference Method)
+    12 - Time Evolution (Crank-Nicolson)
+
+  Enter the number of the desired potential and follow the on-screen
+  prompts to supply physical parameters.  Results are printed to the
+  console and exported to CSV files in the working directory.
+
+
+================================================================================
+3.  CLASS REFERENCE: QuantumParticle
+================================================================================
+
+  Header:  QuantumParticle.h
+  Source:  QuantumParticle.cpp
+
+  Constructor
+  -----------
+    QuantumParticle(string name, double mass, double length, int dimension)
+
+      name      -- Human-readable label (e.g. "Electron").
+      mass      -- Particle mass in kilograms.
+      length    -- Characteristic confinement length in meters (e.g. box
+                   width, well half-width).
+      dimension -- Spatial dimensionality (currently 1).
+
+  Data Members
+  ------------
+    string                     name
+    double                     mass
+    double                     length
+    int                        dimension
+    vector<complex<double>>    coefficients   (reserved for superposition states)
+
+  ---------------------------------------------------------------------------
+  3.1  Infinite Square Well Methods
+  ---------------------------------------------------------------------------
+
+    double computeEnergy1DBox(int n)
+        Returns the energy of the n-th eigenstate (n >= 1) in Joules.
+        Formula:  E_n = n^2 pi^2 hbar^2 / (2 m L^2).
+
+    vector<double> computeWavefunction1DBox(int n, int numPoints)
+        Returns a vector of psi(x) sampled at numPoints equally spaced
+        points in [0, L].
+
+    complex<double> computeTimeDependentPsi1DBox(int n, double x, double t)
+        Returns the complex time-dependent wavefunction at position x and
+        time t for the n-th eigenstate.
+
+    vector<complex<double>> computeMomentumSpaceWavefunction1DBox(
+                                int n, int numPoints)
+        Computes the momentum-space wavefunction phi(p) by numerical
+        Fourier transform over 200 spatial grid points.  The momentum
+        range is [-1e-23, 1e-23] kg m/s.
+
+    void exportWavefunctionCSV(string filename, int n, int numPoints)
+        Writes a CSV file with columns  x, psi  for the n-th eigenstate.
+
+  ---------------------------------------------------------------------------
+  3.2  Harmonic Oscillator Methods
+  ---------------------------------------------------------------------------
+
+    double computeEnergy1DHarmonicOscillator(int n, double omega)
+        Returns E_n = hbar * omega * (n + 0.5).
+        NOTE: This method uses hbar = 1.0 (dimensionless units) for
+        compatibility with the FDM solver benchmarking mode.
+
+    double computeHarmonicOscillatorPsi(int n, double x, double omega)
+        Returns psi_n(x) using Hermite polynomials (n = 0 or 1 only).
+        Uses SI hbar for the length scale alpha = m omega / hbar.
+
+    void exportHarmonicOscillatorWavefunctionCSV(
+             string filename, int n, double omega, int numPoints)
+        Writes CSV with columns  x, psi  over [-1 nm, +1 nm].
+
+  ---------------------------------------------------------------------------
+  3.3  Finite Square Well Methods
+  ---------------------------------------------------------------------------
+
+    double computeGroundStateEnergyFiniteSquareWell(double V0,
+                                                     int numIterations)
+        Finds the ground-state energy by bisection on the transcendental
+        equation  k tan(k a) = kappa,  where a = length/2.
+        V0 is the well depth in Joules; numIterations controls accuracy.
+
+    void exportFiniteSquareWellWavefunctionCSV(
+             string filename, double V0, double energy, int numPoints)
+        Writes the piecewise wavefunction (sinusoidal inside |x| <= a,
+        exponentially decaying outside) to CSV.
+
+    double computeFiniteSquareWellNormalization(
+               double V0, double energy, int numX)
+        Numerically integrates |psi|^2 over [-2a, 2a] and returns the
+        normalization constant 1/sqrt(integral).
+
+    void exportFiniteSquareWellTimeEvolutionCSV(
+             string filename, double V0, double energy,
+             int numX, int numT, double timeStep)
+        Placeholder for future time-dependent finite-well export.
+
+  ---------------------------------------------------------------------------
+  3.4  Coulomb (Hydrogen-like) Potential Methods
+  ---------------------------------------------------------------------------
+
+    double computeCoulombEnergy(int n, double Z)
+        Returns the Bohr energy level for principal quantum number n
+        and nuclear charge Z.  Uses SI constants.
+
+    double computeCoulombRadialWavefunction(int n, double r, double Z)
+        Returns a simplified s-wave radial wavefunction R(r) for the
+        hydrogen-like atom.
+
+    void exportCoulombWavefunctionCSV(
+             string filename, int n, double Z, int numPoints)
+        Writes CSV with columns  r, psi  over [0, 0.5 nm].
+
+    void exportCoulombTimeEvolutionCSV(
+             string filename, int n, double Z,
+             int numR, int numT, double tMax)
+        Writes CSV with columns  r, t, RePsi, ImPsi, AbsPsi, Phase
+        for animated visualization of the stationary-state phase rotation.
+
+  ---------------------------------------------------------------------------
+  3.5  Delta Potential Methods
+  ---------------------------------------------------------------------------
+
+    double computeDeltaPotentialEnergy(double V0)
+        Returns the single bound-state energy:
+        E = -m^2 V0^2 / (2 hbar^2).
+
+    void exportDeltaPotentialWavefunctionCSV(
+             string filename, double V0, int numPoints)
+        Writes CSV with columns  x, psi  over [-1 nm, +1 nm].
+        Wavefunction:  psi(x) = sqrt(kappa) * exp(-kappa |x|).
+
+  ---------------------------------------------------------------------------
+  3.6  Double Delta Potential Methods
+  ---------------------------------------------------------------------------
+
+    double computeDoubleDeltaEnergy(double V0, double a)
+        Returns an approximate symmetric bound-state energy.
+
+    void exportDoubleDeltaWavefunctionCSV(
+             string filename, double V0, double a, int numPoints)
+        Writes the symmetric superposition of two exponential decays
+        centered at x = +/- a.
+
+  ---------------------------------------------------------------------------
+  3.7  Step Potential
+  ---------------------------------------------------------------------------
+
+    void exportStepPotentialWavefunctionCSV(
+             string filename, double E, double V0, int numPoints)
+        Writes the real part of the wavefunction for a particle of
+        energy E incident on a step of height V0.  Region x < 0 has
+        an oscillatory wave; x >= 0 has either an oscillatory
+        (E > V0) or decaying (E < V0) solution.
+
+  ---------------------------------------------------------------------------
+  3.8  Rectangular Barrier
+  ---------------------------------------------------------------------------
+
+    void exportBarrierWavefunctionCSV(
+             string filename, double E, double V0, double a,
+             int numPoints)
+        Writes the wavefunction for a particle incident on a barrier
+        of height V0 and half-width a.  Tunneling behavior is shown
+        for E < V0.
+
+  ---------------------------------------------------------------------------
+  3.9  Triangular Well
+  ---------------------------------------------------------------------------
+
+    void exportTriangularWellWavefunctionCSV(
+             string filename, double F, double energy, int numPoints)
+        Writes a semi-classical wavefunction approximation for a
+        linear (electric-field) confining potential V(x) = Fx.
+
+  ---------------------------------------------------------------------------
+  3.10  Parabolic Well
+  ---------------------------------------------------------------------------
+
+    double computeParabolicWellEnergy(int n, double omega)
+        Identical to the harmonic oscillator energy formula (SI units).
+
+    double computeParabolicWellWavefunction(int n, double x, double omega)
+        Returns psi_n(x) for n = 0, 1 using Hermite polynomials (SI units).
+
+    void exportParabolicWellWavefunctionCSV(
+             string filename, int n, double omega, int numPoints)
+        Writes CSV over [-1 nm, +1 nm].
+
+
+================================================================================
+4.  CLASS REFERENCE: NumericalSolver
+================================================================================
+
+  Header:  NumericalSolver.h
+  Source:  NumericalSolver.cpp
+
+  All methods are static.
+
+  ---------------------------------------------------------------------------
+  4.1  Finite-Difference Eigenvalue Solver
+  ---------------------------------------------------------------------------
+
+    static void solveSchrodingerFDM(
+        double mass,
+        double xMin,
+        double xMax,
+        int    numPoints,
+        const vector<double>& potential,
+        int    numEigenstates,
+        const string& outputFilename
+    )
+
+    Discretizes the time-independent Schrodinger equation on a uniform
+    grid of numPoints between xMin and xMax.  The potential vector must
+    have exactly numPoints entries.
+
+    Uses the Eigen SelfAdjointEigenSolver to diagonalize the resulting
+    Hamiltonian matrix.
+
+    Outputs:
+      - <outputFilename>   : CSV with columns  x, psi0, psi1, ...
+      - fdm_energies.csv   : CSV with columns  index, energy_J
+
+    The solver currently operates in dimensionless units (hbar = 1,
+    mass = 1) for the FDM path.  Pass mass = 1.0 from the caller.
+
+    Supported user-defined potentials (from the main menu):
+      1) Finite well:     V = 0 inside |x| <= a, V0 outside
+      2) Double well:     two finite wells centered at +/- d
+      3) Gaussian well:   V = V0 * exp(-(x/sigma)^2)
+      4) Quartic:         V = lambda * x^4
+      5) Harmonic:        V = 0.5 * omega^2 * x^2  (benchmarked against
+                           analytical results)
+
+  ---------------------------------------------------------------------------
+  4.2  Crank-Nicolson Time Evolution
+  ---------------------------------------------------------------------------
+
+    static void timeEvolveCrankNicolson(
+        double mass,
+        double xMin,
+        double xMax,
+        int    numPoints,
+        const vector<double>&          V,
+        const vector<complex<double>>& psi0,
+        double dt,
+        int    numSteps,
+        const string& outCsv,
+        int    snapshotEvery = 10
+    )
+
+    Propagates the initial state psi0 forward in time under the
+    potential V using the Crank-Nicolson implicit scheme.
+
+    The Hamiltonian is built as a sparse matrix; the LU factorization
+    is performed once and reused for all time steps.  Dirichlet boundary
+    conditions (psi = 0 at endpoints) are enforced.
+
+    Output CSV columns:  x, t, RePsi, ImPsi, AbsPsi, Phase
+    A snapshot is written every snapshotEvery steps.
+
+    Parameters:
+      mass          -- particle mass (kg, SI)
+      xMin, xMax    -- spatial domain
+      numPoints     -- number of grid points
+      V             -- potential array (size numPoints)
+      psi0          -- initial complex wavefunction (size numPoints)
+      dt            -- time step in seconds
+      numSteps      -- total number of time steps
+      outCsv        -- output CSV filename
+      snapshotEvery -- interval between saved snapshots
+
+  ---------------------------------------------------------------------------
+  4.3  Gaussian Initial State
+  ---------------------------------------------------------------------------
+
+    static vector<complex<double>> makeGaussianInitial(
+        int    numPoints,
+        double xMin,
+        double xMax,
+        double x0,
+        double sigma,
+        double k0
+    )
+
+    Constructs a normalized Gaussian wave packet:
+      psi(x, 0) = N * exp[-(x - x0)^2 / (2 sigma^2)] * exp(i k0 x)
+
+    Parameters:
+      x0    -- center of the packet (meters)
+      sigma -- spatial width (meters)
+      k0    -- initial wave number / momentum (1/m)
+
+
+================================================================================
+5.  MENU OPTIONS REFERENCE
+================================================================================
+
+  Option  Potential                   User Inputs
+  ------  --------------------------  ------------------------------------------
+    1     Infinite Square Well        n (energy level)
+    2     Harmonic Oscillator         n, omega
+    3     Finite Square Well          V0 (well depth, J)
+    4     Coulomb Potential           n (principal quantum number), Z
+    5     Delta Potential             V0 (strength, J*m)
+    6     Double Delta Potential      V0, a (separation, m)
+    7     Step Potential              E (particle energy, J), V0 (step, J)
+    8     Rectangular Barrier         E, V0, a (half-width, m)
+    9     Triangular Well             F (field, J/m), energy (J)
+   10     Parabolic Well              n, omega (rad/s)
+   11     Numerical Solver (FDM)      xMin, xMax, numPoints, numEigenstates,
+                                      then potential sub-menu (1-5)
+   12     Crank-Nicolson Evolution    xMin, xMax, N, dt, steps, snapshot
+                                      interval, V0, a, x0, sigma, k0
+
+  Default particle:  Electron (m = 9.11e-31 kg, L = 1e-10 m, dim = 1).
+
+
+================================================================================
+6.  OUTPUT FILES
+================================================================================
+
+  The application generates CSV files in the current working directory.
+  The exact filenames depend on the chosen menu option:
+
+    box_wavefunction.csv               -- Infinite square well psi(x)
+    oscillator_wavefunction.csv        -- Harmonic oscillator psi(x)
+    finite_well_wavefunction.csv       -- Finite square well psi(x)
+    finite_well_time_evolution.csv     -- Finite well time evolution (placeholder)
+    coulomb_wavefunction.csv           -- Coulomb radial wavefunction R(r)
+    coulomb_time.csv                   -- Coulomb time evolution
+    delta_wavefunction.csv             -- Delta potential psi(x)
+    double_delta_wavefunction.csv      -- Double delta psi(x)
+    step_potential_wavefunction.csv    -- Step potential psi(x)
+    barrier_wavefunction.csv           -- Rectangular barrier psi(x)
+    triangular_well.csv                -- Triangular well psi(x)
+    parabolic_well_wavefunction.csv    -- Parabolic well psi(x)
+    fdm_output.csv                     -- FDM eigenstates (x, psi0, psi1, ...)
+    fdm_energies.csv                   -- FDM energy eigenvalues
+    cn_time.csv                        -- Crank-Nicolson time snapshots
+
+  All CSV files use comma-separated values with a header row.
+
+
+================================================================================
+7.  VISUALIZATION WITH PYTHON
+================================================================================
+
+  The repository includes  animate_time.py  for animating time-evolution
+  data produced by the Crank-Nicolson solver.
+
+  Usage:
+    1. Run the application with menu option 12 to generate cn_time.csv.
+    2. From the repository root, execute:
+
+         python animate_time.py
+
+    3. A Matplotlib window will display an animation of |psi(x,t)|^2.
+
+  Requirements:
+    - Python 3.x
+    - pandas
+    - numpy
+    - matplotlib
+
+  The script reads cn_time.csv by default.  To change the input file,
+  edit the CSV variable at the top of the script.
+
+  To save the animation:
+    - As MP4:  ani.save("evolution.mp4", fps=30)   (requires ffmpeg)
+    - As GIF:  ani.save("evolution.gif", fps=20)   (requires Pillow)
+
+
+================================================================================
+8.  EXTENDING THE PROJECT
+================================================================================
+
+  Adding a New Analytical Potential
+  ---------------------------------
+  1. Declare new methods in QuantumParticle.h:
+       - computeEnergy...()       for eigenvalues
+       - compute...Psi()          for the spatial wavefunction
+       - export...CSV()           for file output
+
+  2. Implement them in QuantumParticle.cpp following the existing patterns.
+
+  3. Add a new  else if (choice == N)  block in main.cpp with the
+     appropriate user prompts and function calls.
+
+  Adding a New Numerical Potential to the FDM Solver
+  ---------------------------------------------------
+  1. In the  choice == 11  block of main.cpp, add a new  else if (p == N)
+     case that fills the vector V with the desired potential values.
+
+  2. No changes to NumericalSolver are needed; it accepts arbitrary V.
+
+  Implementing Higher Hermite Polynomials
+  ----------------------------------------
+  In computeHarmonicOscillatorPsi() and computeParabolicWellWavefunction(),
+  replace the placeholder  hermite = 0.0  for n >= 2 with the recurrence:
+    H_{n+1}(y) = 2 y H_n(y) - 2 n H_{n-1}(y)
+  where y = sqrt(alpha) * x.
+
+
+================================================================================
+  Repository:  https://github.com/StavrosMetalGear/QuantumCore
+================================================================================

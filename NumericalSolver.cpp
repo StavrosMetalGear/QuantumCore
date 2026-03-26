@@ -1,4 +1,6 @@
-﻿#include "pch.h"  // MUST be first
+﻿#ifdef _MSC_VER
+#include "pch.h"
+#endif
 #include "NumericalSolver.h"
 #include "Eigen/Dense"
 #include "Eigen/Sparse"

@@ -1,0 +1,178 @@
+================================================================================
+                              QuantumCore
+        A Computational Framework for One-Dimensional Quantum Mechanics
+================================================================================
+
+                          Scientific Description
+
+
+1.  OVERVIEW
+    --------
+    QuantumCore is a C++ computational physics library and interactive console
+    application designed for the numerical and analytical study of
+    one-dimensional quantum-mechanical systems.  The software provides closed-
+    form solutions where available, numerical eigenvalue solvers based on the
+    finite-difference method (FDM), and time-dependent propagation via the
+    Crank-Nicolson implicit scheme.  An accompanying Python script enables
+    real-time animation of probability-density evolution.
+
+    The project is under active development.  Its long-term goal is to serve
+    as a general-purpose solver for textbook and research-level problems in
+    non-relativistic quantum mechanics.
+
+
+2.  PHYSICAL MODELS IMPLEMENTED
+    ----------------------------
+    The following one-dimensional potentials are currently supported.  For each
+    potential the code can compute energy eigenvalues, spatial wavefunctions,
+    and (where applicable) their time evolution.
+
+    2.1  Infinite Square Well (Particle in a Box)
+         V(x) = 0  for 0 < x < L,  V(x) = infinity  otherwise.
+         Analytical energy spectrum:  E_n = n^2 pi^2 hbar^2 / (2 m L^2).
+         Position-space and momentum-space wavefunctions are computed in
+         closed form.  Time-dependent phase factors are applied exactly.
+
+    2.2  Quantum Harmonic Oscillator
+         V(x) = (1/2) m omega^2 x^2.
+         Energy spectrum:  E_n = hbar omega (n + 1/2).
+         Wavefunctions are evaluated using Hermite polynomials (currently
+         implemented for n = 0, 1; higher orders are extensible).
+
+    2.3  Finite Square Well
+         V(x) = -V_0  for |x| <= a,  V(x) = 0  otherwise.
+         The ground-state energy is obtained by bisection on the
+         transcendental matching condition  k tan(ka) = kappa.
+         Wavefunctions are constructed piecewise (sinusoidal inside,
+         exponentially decaying outside) and normalized numerically.
+
+    2.4  Coulomb (Hydrogen-like) Potential
+         V(r) = -Z e^2 / (4 pi epsilon_0 r).
+         Bohr energy levels:  E_n = -Z^2 m e^4 / (8 epsilon_0^2 hbar^2 n^2).
+         Simplified s-wave radial wavefunctions (R_n0) are provided.
+         Time-dependent complex phase evolution is exported for visualization.
+
+    2.5  Dirac Delta Potential
+         V(x) = -V_0 delta(x).
+         Single bound state with E = -m V_0^2 / (2 hbar^2).
+         Wavefunction:  psi(x) = sqrt(kappa) exp(-kappa |x|).
+
+    2.6  Double Dirac Delta Potential
+         V(x) = -V_0 [delta(x - a) + delta(x + a)].
+         Approximate symmetric bound-state energy and wavefunction are
+         computed as a superposition of two decaying exponentials.
+
+    2.7  Step Potential
+         V(x) = 0  for x < 0,  V(x) = V_0  for x >= 0.
+         For E > V_0 the transmitted oscillatory wave is shown; for E < V_0
+         the evanescent (tunneling) region is resolved.
+
+    2.8  Rectangular Potential Barrier
+         V(x) = V_0  for |x| <= a,  V(x) = 0  otherwise.
+         Both the classically allowed (E > V_0) and tunneling (E < V_0)
+         regimes are plotted, illustrating quantum tunneling.
+
+    2.9  Triangular Well Potential
+         V(x) = F x  for x > 0 (linear electric-field confinement).
+         A semi-classical WKB-style wavefunction approximation is used.
+
+    2.10 Parabolic Well
+         Equivalent in form to the harmonic oscillator; provided as a
+         separate interface for pedagogical flexibility.
+
+
+3.  NUMERICAL METHODS
+    ------------------
+    3.1  Finite-Difference Eigenvalue Solver
+         The time-independent Schrodinger equation is discretized on a
+         uniform grid with Dirichlet boundary conditions.  The resulting
+         real symmetric tridiagonal Hamiltonian matrix is diagonalized
+         using the Eigen library's SelfAdjointEigenSolver, yielding
+         energy eigenvalues and eigenvectors simultaneously.  The method
+         accepts arbitrary user-defined potentials, including:
+           - Finite well
+           - Double well
+           - Gaussian well
+           - Quartic anharmonic potential
+           - Harmonic oscillator (for benchmarking against exact results)
+
+    3.2  Crank-Nicolson Time Propagation
+         The time-dependent Schrodinger equation is integrated using the
+         unconditionally stable, unitary Crank-Nicolson implicit scheme:
+           (I + i dt H / 2 hbar) psi^{n+1} = (I - i dt H / 2 hbar) psi^n.
+         The sparse linear system is factored once (SparseLU) and
+         back-substituted at each time step.  Periodic renormalization
+         corrects accumulated floating-point drift.  Snapshots of the
+         complex wavefunction are written to CSV at user-specified
+         intervals.
+
+    3.3  Initial-State Construction
+         A Gaussian wave packet with tunable center x_0, width sigma,
+         and initial momentum k_0 is provided:
+           psi(x, 0) = N exp[-(x - x_0)^2 / (2 sigma^2)] exp(i k_0 x).
+
+
+4.  SOFTWARE ARCHITECTURE
+    ----------------------
+    Language:       C++17 (Microsoft Visual Studio)
+    Linear Algebra: Eigen 3 (header-only, bundled in repository)
+    Visualization:  Python 3 (Matplotlib / pandas) via exported CSV files
+
+    Classes:
+      QuantumParticle  -- Encapsulates particle properties (mass, confining
+                          length, dimensionality) and all analytical
+                          potential solvers.
+      NumericalSolver  -- Static methods for FDM eigenvalue computation and
+                          Crank-Nicolson time evolution.
+
+    Data exchange between the C++ solver and the Python visualization layer
+    is achieved through CSV files.  The Python script animate_time.py reads
+    the time-evolution CSV and produces an animated plot of |psi(x,t)|^2.
+
+
+5.  PHYSICAL CONSTANTS
+    -------------------
+    The code uses SI units throughout the analytical solvers:
+      hbar      = 1.0545718 x 10^-34  J s
+      e         = 1.602176634 x 10^-19  C
+      epsilon_0 = 8.854187817 x 10^-12  F/m
+      a_0       = 5.29177210903 x 10^-11  m  (Bohr radius)
+      m_e       = 9.11 x 10^-31  kg  (electron mass, default particle)
+
+    The FDM solver optionally operates in dimensionless (natural) units
+    (hbar = m = 1) for numerical stability and pedagogical clarity.
+
+
+6.  CURRENT LIMITATIONS AND FUTURE DIRECTIONS
+    -------------------------------------------
+    - Hermite polynomial evaluation is limited to n = 0 and n = 1;
+      a general recurrence relation will be implemented.
+    - The Coulomb radial wavefunction is restricted to s-states (l = 0);
+      associated Laguerre polynomials for arbitrary (n, l) are planned.
+    - All models are currently one-dimensional; extension to two- and
+      three-dimensional systems is a long-term objective.
+    - Scattering-state analysis (transmission and reflection coefficients)
+      is not yet computed for the step and barrier potentials.
+    - Perturbation theory (time-independent and time-dependent) modules
+      are envisioned.
+    - A graphical user interface or integrated plotting back-end may
+      replace the current CSV-based workflow.
+    - Additional potentials (Morse, Poschl-Teller, periodic Kronig-Penney,
+      Woods-Saxon) are candidates for future inclusion.
+
+
+7.  REFERENCES
+    ----------
+    [1] D. J. Griffiths, "Introduction to Quantum Mechanics," 3rd ed.,
+        Cambridge University Press, 2018.
+    [2] R. Shankar, "Principles of Quantum Mechanics," 2nd ed.,
+        Springer, 1994.
+    [3] W. H. Press et al., "Numerical Recipes," 3rd ed.,
+        Cambridge University Press, 2007.
+    [4] Eigen C++ Template Library, https://eigen.tuxfamily.org/
+
+
+================================================================================
+  Repository:  https://github.com/StavrosMetalGear/QuantumCore
+  License:     (MIT)
+================================================================================

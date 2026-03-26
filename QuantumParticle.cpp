@@ -1,4 +1,6 @@
-﻿#include "pch.h"
+﻿#ifdef _MSC_VER
+#include "pch.h"
+#endif
 #include "QuantumParticle.h"
 #include <cmath>
 #include <fstream>
