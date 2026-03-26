@@ -77,6 +77,21 @@ public:
     std::pair<double, double> computeDeltaScatteringRT(double E, double b);
     std::pair<double, double> computeBarrierRT(double E, double V0, double a);
 
+    // Kronig-Penney model
+    double kronigPenneyDispersion(double E, double V0, double a, double b);
+    double kronigPenneyDeltaDispersion(double E, double Pprime, double a);
+    std::vector<std::pair<double, double>> computeKronigPenneyBands(
+        double V0, double a, double b, int numEnergySamples, int maxBands);
+    void exportKronigPenneyBandsCSV(
+        const std::string& filename, double V0, double a, double b,
+        int numK, int numEnergySamples, int maxBands);
+
+    // Tight-binding model
+    double tightBindingEnergy(double E0, double t, double k, double a);
+    double tightBindingEffectiveMass(double t, double a);
+    void exportTightBindingDispersionCSV(
+        const std::string& filename, double E0, double t, double a, int numK);
+
 };
 
 

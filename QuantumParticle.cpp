@@ -635,6 +635,145 @@ std::pair<double, double> QuantumParticle::computeBarrierRT(
     }
 }
 
+// ============================================================
+// Kronig-Penney model
+// ============================================================
+
+// Full dispersion: cos[k(a+b)] = cos(alpha*a)*cosh(gamma*b)
+//                                + (gamma^2 - alpha^2)/(2*alpha*gamma) * sin(alpha*a)*sinh(gamma*b)
+// Returns the right-hand side for a given energy E (0 < E < V0).
+double QuantumParticle::kronigPenneyDispersion(double E, double V0, double a, double b) {
+    const double hbar = 1.0545718e-34;
+    double m = mass;
+
+    double alpha = sqrt(2.0 * m * E) / hbar;
+    double gamma = sqrt(2.0 * m * (V0 - E)) / hbar;
+
+    if (alpha < 1e-30 || gamma < 1e-30) return 2.0;
+
+    double term1 = cos(alpha * a) * cosh(gamma * b);
+    double term2 = ((gamma * gamma - alpha * alpha) / (2.0 * alpha * gamma))
+                   * sin(alpha * a) * sinh(gamma * b);
+    return term1 + term2;
+}
+
+// Delta-barrier limit: P' * sin(alpha*a)/(alpha*a) + cos(alpha*a)
+double QuantumParticle::kronigPenneyDeltaDispersion(double E, double Pprime, double a) {
+    const double hbar = 1.0545718e-34;
+    double m = mass;
+
+    double alpha = sqrt(2.0 * m * E) / hbar;
+    double aa = alpha * a;
+
+    if (fabs(aa) < 1e-30) return Pprime + 1.0;
+
+    return Pprime * sin(aa) / aa + cos(aa);
+}
+
+// Find allowed energy bands by scanning energies and checking |f(E)| <= 1
+std::vector<std::pair<double, double>> QuantumParticle::computeKronigPenneyBands(
+    double V0, double a, double b, int numEnergySamples, int maxBands)
+{
+    std::vector<std::pair<double, double>> bands;
+    double Emax = V0 * 5.0;
+    double dE = Emax / numEnergySamples;
+
+    bool inBand = false;
+    double bandStart = 0.0;
+
+    for (int i = 1; i < numEnergySamples; ++i) {
+        double E = i * dE;
+        if (E >= V0) continue;
+
+        double f = kronigPenneyDispersion(E, V0, a, b);
+        bool allowed = (f >= -1.0 && f <= 1.0);
+
+        if (allowed && !inBand) {
+            bandStart = E;
+            inBand = true;
+        }
+        else if (!allowed && inBand) {
+            bands.push_back({ bandStart, E - dE });
+            inBand = false;
+            if ((int)bands.size() >= maxBands) break;
+        }
+    }
+    if (inBand) {
+        bands.push_back({ bandStart, (numEnergySamples - 1) * dE });
+    }
+    return bands;
+}
+
+// Export E(k) band structure to CSV
+void QuantumParticle::exportKronigPenneyBandsCSV(
+    const std::string& filename, double V0, double a, double b,
+    int numK, int numEnergySamples, int maxBands)
+{
+    std::ofstream out(filename);
+    out << "k,E,band\n";
+
+    double d = a + b;
+    double Emax = V0 * 5.0;
+    double dE = Emax / numEnergySamples;
+
+    // For each k in [-pi/d, pi/d], find energies where f(E) = cos(kd)
+    for (int ik = 0; ik < numK; ++ik) {
+        double k = -M_PI / d + ik * (2.0 * M_PI / d) / (numK - 1);
+        double target = cos(k * d);
+
+        int bandIndex = 0;
+        double prevF = kronigPenneyDispersion(dE, V0, a, b);
+
+        for (int ie = 2; ie < numEnergySamples; ++ie) {
+            double E = ie * dE;
+            if (E >= V0) continue;
+
+            double f = kronigPenneyDispersion(E, V0, a, b);
+
+            // Check if f crossed the target value
+            if ((prevF - target) * (f - target) <= 0.0 && fabs(f) <= 1.5) {
+                // Linear interpolation for the crossing energy
+                double Ecross = (E - dE) + dE * fabs(prevF - target) / (fabs(prevF - target) + fabs(f - target));
+                out << k << "," << Ecross << "," << bandIndex << "\n";
+                bandIndex++;
+                if (bandIndex >= maxBands) break;
+            }
+            prevF = f;
+        }
+    }
+    out.close();
+}
+
+// ============================================================
+// Tight-binding model
+// ============================================================
+
+// E(k) = E0 - 2t * cos(k * a)
+double QuantumParticle::tightBindingEnergy(double E0, double t, double k, double a) {
+    return E0 - 2.0 * t * cos(k * a);
+}
+
+// m* = hbar^2 / (2 * t * a^2)
+double QuantumParticle::tightBindingEffectiveMass(double t, double a) {
+    const double hbar = 1.0545718e-34;
+    return (hbar * hbar) / (2.0 * t * a * a);
+}
+
+// Export E(k) dispersion over the first Brillouin zone [-pi/a, pi/a]
+void QuantumParticle::exportTightBindingDispersionCSV(
+    const std::string& filename, double E0, double t, double a, int numK)
+{
+    std::ofstream out(filename);
+    out << "k,E\n";
+
+    for (int i = 0; i < numK; ++i) {
+        double k = -M_PI / a + i * (2.0 * M_PI / a) / (numK - 1);
+        double E = tightBindingEnergy(E0, t, k, a);
+        out << k << "," << E << "\n";
+    }
+    out.close();
+}
+
 
 
 

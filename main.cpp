@@ -2,9 +2,15 @@
 #include "pch.h"
 #endif
 #include <iostream>
+#include <cmath>
+#include <fstream>
 #include "QuantumParticle.h"
 #include "NumericalSolver.h"
 #include <algorithm>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979
+#endif
 
 int main() {
     std::cout << "Quantum Mechanics Simulation (QuantumCore)\n";
@@ -25,8 +31,8 @@ int main() {
     std::cout << "11 - Numerical Solver (Finite Difference Method)\n";
     std::cout << "12 - Time Evolution (Crank–Nicolson)\n";
     std::cout << "13 - Scattering Coefficients (R, T)\n";
-
-
+    std::cout << "14 - Kronig-Penney Model (Band Structure)\n";
+    std::cout << "15 - Tight-Binding Model\n";
 
     int choice;
     std::cin >> choice;
@@ -378,6 +384,95 @@ int main() {
         else {
             std::cout << "Invalid selection.\n";
         }
+    }
+
+    else if (choice == 14) {
+        std::cout << "\nKronig-Penney Model\n";
+        std::cout << "1 - Full model (finite barriers)\n";
+        std::cout << "2 - Delta-barrier limit\n";
+        std::cout << "Select: ";
+        int kp;
+        std::cin >> kp;
+
+        if (kp == 1) {
+            double V0, a, b;
+            std::cout << "Barrier height V0 (J): "; std::cin >> V0;
+            std::cout << "Well width a (m): "; std::cin >> a;
+            std::cout << "Barrier width b (m): "; std::cin >> b;
+
+            auto bands = particle.computeKronigPenneyBands(V0, a, b, 5000, 5);
+            std::cout << "\nAllowed energy bands (0 < E < V0):\n";
+            for (int i = 0; i < (int)bands.size(); ++i) {
+                std::cout << "  Band " << i + 1 << ": ["
+                          << bands[i].first << ", " << bands[i].second << "] J\n";
+            }
+
+            particle.exportKronigPenneyBandsCSV(
+                "kronig_penney_bands.csv", V0, a, b, 200, 5000, 5);
+            std::cout << "Band structure saved to kronig_penney_bands.csv\n";
+        }
+        else if (kp == 2) {
+            double Pprime, a;
+            std::cout << "P' parameter (dimensionless, = m*V0*b*a/hbar^2): "; std::cin >> Pprime;
+            std::cout << "Lattice spacing a (m): "; std::cin >> a;
+
+            const double hbar = 1.0545718e-34;
+            std::ofstream out("kronig_penney_delta.csv");
+            out << "alphaA,f\n";
+
+            int N = 1000;
+            double aaMax = 10.0 * M_PI;
+            std::cout << "\nAllowed bands (alpha*a ranges where |f| <= 1):\n";
+            bool inBand = false;
+            double bandStart = 0.0;
+
+            for (int i = 1; i <= N; ++i) {
+                double aa = i * aaMax / N;
+                double f = Pprime * sin(aa) / aa + cos(aa);
+                out << aa << "," << f << "\n";
+
+                bool allowed = (f >= -1.0 && f <= 1.0);
+                if (allowed && !inBand) {
+                    bandStart = aa;
+                    inBand = true;
+                }
+                else if (!allowed && inBand) {
+                    double E_low = (hbar * hbar * bandStart * bandStart) / (2.0 * particle.mass * a * a);
+                    double E_high = (hbar * hbar * (aa - aaMax / N) * (aa - aaMax / N)) / (2.0 * particle.mass * a * a);
+                    std::cout << "  alpha*a in [" << bandStart << ", " << aa - aaMax / N
+                              << "]  =>  E in [" << E_low << ", " << E_high << "] J\n";
+                    inBand = false;
+                }
+            }
+            out.close();
+            std::cout << "Dispersion function saved to kronig_penney_delta.csv\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    else if (choice == 15) {
+        std::cout << "\nTight-Binding Model\n";
+        double E0, t, a;
+        std::cout << "On-site energy E0 (J): "; std::cin >> E0;
+        std::cout << "Hopping parameter t (J): "; std::cin >> t;
+        std::cout << "Lattice spacing a (m): "; std::cin >> a;
+
+        double mStar = particle.tightBindingEffectiveMass(t, a);
+        double bandwidth = 4.0 * t;
+        double Emin = E0 - 2.0 * t;
+        double Emax = E0 + 2.0 * t;
+
+        std::cout << "\nResults:\n";
+        std::cout << "  Band range: [" << Emin << ", " << Emax << "] J\n";
+        std::cout << "  Bandwidth: " << bandwidth << " J\n";
+        std::cout << "  Effective mass m* = " << mStar << " kg\n";
+        std::cout << "  m* / m_e = " << mStar / 9.11e-31 << "\n";
+
+        particle.exportTightBindingDispersionCSV(
+            "tight_binding_dispersion.csv", E0, t, a, 500);
+        std::cout << "Dispersion E(k) saved to tight_binding_dispersion.csv\n";
     }
 
     return 0;
