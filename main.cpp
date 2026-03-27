@@ -33,6 +33,7 @@ int main() {
     std::cout << "13 - Scattering Coefficients (R, T)\n";
     std::cout << "14 - Kronig-Penney Model (Band Structure)\n";
     std::cout << "15 - Tight-Binding Model\n";
+    std::cout << "16 - Harmonic Oscillator (Full Analysis)\n";
 
     int choice;
     std::cin >> choice;
@@ -473,6 +474,67 @@ int main() {
         particle.exportTightBindingDispersionCSV(
             "tight_binding_dispersion.csv", E0, t, a, 500);
         std::cout << "Dispersion E(k) saved to tight_binding_dispersion.csv\n";
+    }
+
+    else if (choice == 16) {
+        std::cout << "\nHarmonic Oscillator - Full Analysis\n";
+        int n;
+        double omega;
+        std::cout << "Enter quantum number n: "; std::cin >> n;
+        std::cout << "Enter angular frequency omega (rad/s): "; std::cin >> omega;
+
+        const double hbar = 1.0545718e-34;
+
+        // Energy
+        double E = particle.computeEnergy1DHarmonicOscillator(n, omega);
+        std::cout << "\n--- Energy ---\n";
+        std::cout << "  E_" << n << " = hbar*omega*(n+1/2) = " << hbar * omega * (n + 0.5) << " J\n";
+
+        // Uncertainty
+        auto [Dx, Dp] = particle.computeHOUncertainty(n, omega);
+        std::cout << "\n--- Uncertainty (state |" << n << ">) ---\n";
+        std::cout << "  Dx = " << Dx << " m\n";
+        std::cout << "  Dp = " << Dp << " kg*m/s\n";
+        std::cout << "  Dx*Dp = " << Dx * Dp << " J*s\n";
+        std::cout << "  Dx*Dp / (hbar/2) = " << Dx * Dp / (hbar / 2.0) << "  (= 2n+1 = " << 2 * n + 1 << ")\n";
+        if (n == 0)
+            std::cout << "  -> Ground state is minimum-uncertainty state\n";
+
+        // Wavefunction (general Hermite, any n)
+        particle.exportHarmonicOscillatorWavefunctionCSV("ho_wavefunction.csv", n, omega, 500);
+        std::cout << "\nWavefunction psi_" << n << " saved to ho_wavefunction.csv\n";
+
+        // Export first several wavefunctions together
+        //int maxN = std::max(n, 5);
+        int maxN = (std::max)(n, 5);
+        particle.exportHOWavefunctionsCSV("ho_wavefunctions_all.csv", maxN, omega, 500);
+        std::cout << "Wavefunctions psi_0..psi_" << maxN << " saved to ho_wavefunctions_all.csv\n";
+
+        // Ladder operator matrices
+        int dim = maxN + 1;
+        particle.exportHOLadderMatrixCSV("ho_ladder_matrices.csv", dim);
+        std::cout << "Ladder matrices (a, a_dag, N) saved to ho_ladder_matrices.csv (dim=" << dim << ")\n";
+
+        // Electric field perturbation
+        std::cout << "\n--- Electric Field ---\n";
+        std::cout << "Apply static electric field? Enter E-field (V/m) [0 to skip]: ";
+        double Efield;
+        std::cin >> Efield;
+
+        if (Efield != 0.0) {
+            double x0 = particle.computeHOShiftInField(omega, Efield);
+            std::cout << "  Equilibrium shift x0 = eE/(m*omega^2) = " << x0 << " m\n";
+
+            std::cout << "\n  Energy levels with field:\n";
+            for (int i = 0; i <= n; ++i) {
+                double Ei_bare = hbar * omega * (i + 0.5);
+                double Ei_field = particle.computeHOEnergyInField(i, omega, Efield);
+                std::cout << "    n=" << i
+                          << "  E_bare=" << Ei_bare
+                          << "  E_field=" << Ei_field
+                          << "  shift=" << Ei_field - Ei_bare << " J\n";
+            }
+        }
     }
 
     return 0;

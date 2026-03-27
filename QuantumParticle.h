@@ -25,9 +25,15 @@ public:
     void exportWavefunctionCSV(const std::string& filename, int n, int numPoints);
 
     // Harmonic oscillator
+    static double hermitePolynomial(int n, double xi);
     double computeEnergy1DHarmonicOscillator(int n, double omega);
     double computeHarmonicOscillatorPsi(int n, double x, double omega);
     void exportHarmonicOscillatorWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints);
+    std::pair<double, double> computeHOUncertainty(int n, double omega);
+    double computeHOEnergyInField(int n, double omega, double electricField);
+    double computeHOShiftInField(double omega, double electricField);
+    void exportHOLadderMatrixCSV(const std::string& filename, int dim);
+    void exportHOWavefunctionsCSV(const std::string& filename, int maxN, double omega, int numPoints);
 
     // Finite square well
     double computeGroundStateEnergyFiniteSquareWell(double V0, int numIterations);

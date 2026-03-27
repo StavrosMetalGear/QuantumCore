@@ -84,24 +84,31 @@ double QuantumParticle::computeEnergy1DHarmonicOscillator(int n, double omega) {
     return hbar * omega * (n + 0.5);
 }
 
+// General Hermite polynomial H_n(xi) via recurrence:
+//   H_0 = 1,  H_1 = 2*xi,  H_{n+1} = 2*xi*H_n - 2*n*H_{n-1}
+double QuantumParticle::hermitePolynomial(int n, double xi) {
+    if (n == 0) return 1.0;
+    if (n == 1) return 2.0 * xi;
+
+    double Hnm2 = 1.0;
+    double Hnm1 = 2.0 * xi;
+    double Hn = 0.0;
+    for (int k = 2; k <= n; ++k) {
+        Hn = 2.0 * xi * Hnm1 - 2.0 * (k - 1) * Hnm2;
+        Hnm2 = Hnm1;
+        Hnm1 = Hn;
+    }
+    return Hn;
+}
+
 double QuantumParticle::computeHarmonicOscillatorPsi(int n, double x, double omega) {
     const double hbar = 1.0545718e-34;
     double alpha = mass * omega / hbar;
+    double xi = sqrt(alpha) * x;
     double normalization = pow(alpha / M_PI, 0.25) / sqrt(pow(2.0, n) * tgamma(n + 1));
-
-    double hermite;
-    if (n == 0) {
-        hermite = 1.0;
-    }
-    else if (n == 1) {
-        hermite = 2.0 * sqrt(alpha) * x;
-    }
-    else {
-        hermite = 0.0; // Extend later
-    }
-
+    double Hn = hermitePolynomial(n, xi);
     double gaussian = exp(-0.5 * alpha * x * x);
-    return normalization * hermite * gaussian;
+    return normalization * Hn * gaussian;
 }
 
 void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(
@@ -118,6 +125,72 @@ void QuantumParticle::exportHarmonicOscillatorWavefunctionCSV(
         double x = -xMax + i * dx;
         double psi = computeHarmonicOscillatorPsi(n, x, omega);
         out << x << "," << psi << "\n";
+    }
+    out.close();
+}
+
+// Dx = sqrt(hbar/(2mw)) * sqrt(2n+1),  Dp = sqrt(m*hbar*w/2) * sqrt(2n+1)
+std::pair<double, double> QuantumParticle::computeHOUncertainty(int n, double omega) {
+    const double hbar = 1.0545718e-34;
+    double factor = sqrt(2.0 * n + 1.0);
+    double Dx = sqrt(hbar / (2.0 * mass * omega)) * factor;
+    double Dp = sqrt(mass * hbar * omega / 2.0) * factor;
+    return { Dx, Dp };
+}
+
+// E_n = hbar*omega*(n+1/2) - e^2*E^2 / (2*m*omega^2)
+double QuantumParticle::computeHOEnergyInField(int n, double omega, double electricField) {
+    const double hbar = 1.0545718e-34;
+    const double e = 1.602176634e-19;
+    double E_ho = hbar * omega * (n + 0.5);
+    double shift = (e * e * electricField * electricField) / (2.0 * mass * omega * omega);
+    return E_ho - shift;
+}
+
+// x0 = eE / (m*omega^2)
+double QuantumParticle::computeHOShiftInField(double omega, double electricField) {
+    const double e = 1.602176634e-19;
+    return (e * electricField) / (mass * omega * omega);
+}
+
+// Export ladder operator matrices (a, a†, N) in Fock basis up to dim
+void QuantumParticle::exportHOLadderMatrixCSV(const std::string& filename, int dim) {
+    std::ofstream out(filename);
+    out << "operator,row,col,value\n";
+
+    for (int i = 0; i < dim; ++i) {
+        // a: <i|a|i+1> = sqrt(i+1)  (upper diagonal)
+        if (i + 1 < dim) {
+            out << "a," << i << "," << i + 1 << "," << sqrt((double)(i + 1)) << "\n";
+        }
+        // a†: <i+1|a†|i> = sqrt(i+1)  (lower diagonal)
+        if (i + 1 < dim) {
+            out << "a_dag," << i + 1 << "," << i << "," << sqrt((double)(i + 1)) << "\n";
+        }
+        // N = a†a: <i|N|i> = i  (diagonal)
+        out << "N," << i << "," << i << "," << i << "\n";
+    }
+    out.close();
+}
+
+// Export multiple wavefunctions psi_0..psi_maxN to one CSV
+void QuantumParticle::exportHOWavefunctionsCSV(
+    const std::string& filename, int maxN, double omega, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "x";
+    for (int n = 0; n <= maxN; ++n)
+        out << ",psi" << n;
+    out << "\n";
+
+    double xMax = 1e-9;
+    double dx = 2 * xMax / numPoints;
+    for (int i = 0; i < numPoints; ++i) {
+        double x = -xMax + i * dx;
+        out << x;
+        for (int n = 0; n <= maxN; ++n)
+            out << "," << computeHarmonicOscillatorPsi(n, x, omega);
+        out << "\n";
     }
     out.close();
 }
@@ -518,22 +591,11 @@ double QuantumParticle::computeParabolicWellEnergy(int n, double omega) {
 double QuantumParticle::computeParabolicWellWavefunction(int n, double x, double omega) {
     const double hbar = 1.0545718e-34;
     double alpha = mass * omega / hbar;
-
+    double xi = sqrt(alpha) * x;
     double normalization = pow(alpha / M_PI, 0.25) / sqrt(pow(2.0, n) * tgamma(n + 1));
-
-    double hermite;
-    if (n == 0) {
-        hermite = 1.0;
-    }
-    else if (n == 1) {
-        hermite = 2.0 * sqrt(alpha) * x;
-    }
-    else {
-        hermite = 0.0; // Placeholder – you can later implement general Hermite recursion
-    }
-
+    double Hn = hermitePolynomial(n, xi);
     double gaussian = exp(-0.5 * alpha * x * x);
-    return normalization * hermite * gaussian;
+    return normalization * Hn * gaussian;
 }
 
 void QuantumParticle::exportParabolicWellWavefunctionCSV(const std::string& filename, int n, double omega, int numPoints) {
