@@ -6,6 +6,8 @@
 #include <fstream>
 #include <complex>
 #include <algorithm>
+#include <tuple>
+#include <iostream>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
@@ -832,6 +834,469 @@ void QuantumParticle::exportTightBindingDispersionCSV(
         double k = -M_PI / a + i * (2.0 * M_PI / a) / (numK - 1);
         double E = tightBindingEnergy(E0, t, k, a);
         out << k << "," << E << "\n";
+    }
+    out.close();
+}
+
+// ============================================================
+// 2D Box
+// ============================================================
+
+double QuantumParticle::computeEnergy2DBox(int nx, int ny, double a, double b) {
+    const double hbar = 1.0545718e-34;
+    return (hbar * hbar * M_PI * M_PI / (2.0 * mass)) *
+           (nx * nx / (a * a) + ny * ny / (b * b));
+}
+
+void QuantumParticle::exportWavefunction2DBoxCSV(
+    const std::string& filename, int nx, int ny, double a, double b, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "x,y,psi\n";
+    double dx = a / numPoints;
+    double dy = b / numPoints;
+    double norm = 2.0 / sqrt(a * b);
+    for (int i = 0; i <= numPoints; ++i) {
+        double x = i * dx;
+        for (int j = 0; j <= numPoints; ++j) {
+            double y = j * dy;
+            double psi = norm * sin(nx * M_PI * x / a) * sin(ny * M_PI * y / b);
+            out << x << "," << y << "," << psi << "\n";
+        }
+    }
+    out.close();
+}
+
+std::vector<std::tuple<int, int, double>> QuantumParticle::listEnergyLevels2DBox(
+    double L, int maxN)
+{
+    const double hbar = 1.0545718e-34;
+    double prefactor = hbar * hbar * M_PI * M_PI / (2.0 * mass * L * L);
+
+    std::vector<std::tuple<int, int, double>> levels;
+    for (int nx = 1; nx <= maxN; ++nx) {
+        for (int ny = 1; ny <= maxN; ++ny) {
+            double E = prefactor * (nx * nx + ny * ny);
+            levels.push_back(std::make_tuple(nx, ny, E));
+        }
+    }
+    std::sort(levels.begin(), levels.end(),
+              [](const std::tuple<int, int, double>& a,
+                 const std::tuple<int, int, double>& b) {
+                  return std::get<2>(a) < std::get<2>(b);
+              });
+    return levels;
+}
+
+void QuantumParticle::exportEnergyLevels2DBoxCSV(
+    const std::string& filename, double L, int maxN)
+{
+    auto levels = listEnergyLevels2DBox(L, maxN);
+    std::ofstream out(filename);
+    out << "nx,ny,E,nx2_plus_ny2\n";
+    for (const auto& lev : levels) {
+        int nx = std::get<0>(lev);
+        int ny = std::get<1>(lev);
+        double E = std::get<2>(lev);
+        out << nx << "," << ny << "," << E << "," << (nx * nx + ny * ny) << "\n";
+    }
+    out.close();
+}
+
+// ============================================================
+// 3D Box
+// ============================================================
+
+double QuantumParticle::computeEnergy3DBox(int nx, int ny, int nz,
+                                           double a, double b, double c)
+{
+    const double hbar = 1.0545718e-34;
+    return (hbar * hbar * M_PI * M_PI / (2.0 * mass)) *
+           (nx * nx / (a * a) + ny * ny / (b * b) + nz * nz / (c * c));
+}
+
+void QuantumParticle::exportWavefunction3DBoxSliceCSV(
+    const std::string& filename, int nx, int ny, int nz,
+    double a, double b, double c, double zSlice, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "x,y,psi\n";
+    double dx = a / numPoints;
+    double dy = b / numPoints;
+    double norm = sqrt(8.0 / (a * b * c));
+    double psiZ = sin(nz * M_PI * zSlice / c);
+    for (int i = 0; i <= numPoints; ++i) {
+        double x = i * dx;
+        for (int j = 0; j <= numPoints; ++j) {
+            double y = j * dy;
+            double psi = norm * sin(nx * M_PI * x / a) * sin(ny * M_PI * y / b) * psiZ;
+            out << x << "," << y << "," << psi << "\n";
+        }
+    }
+    out.close();
+}
+
+std::vector<std::tuple<int, int, int, double>> QuantumParticle::listEnergyLevels3DBox(
+    double L, int maxN)
+{
+    const double hbar = 1.0545718e-34;
+    double prefactor = hbar * hbar * M_PI * M_PI / (2.0 * mass * L * L);
+
+    std::vector<std::tuple<int, int, int, double>> levels;
+    for (int nx = 1; nx <= maxN; ++nx) {
+        for (int ny = 1; ny <= maxN; ++ny) {
+            for (int nz = 1; nz <= maxN; ++nz) {
+                double E = prefactor * (nx * nx + ny * ny + nz * nz);
+                levels.push_back(std::make_tuple(nx, ny, nz, E));
+            }
+        }
+    }
+    std::sort(levels.begin(), levels.end(),
+              [](const std::tuple<int, int, int, double>& a,
+                 const std::tuple<int, int, int, double>& b) {
+                  return std::get<3>(a) < std::get<3>(b);
+              });
+    return levels;
+}
+
+void QuantumParticle::exportEnergyLevels3DBoxCSV(
+    const std::string& filename, double L, int maxN)
+{
+    auto levels = listEnergyLevels3DBox(L, maxN);
+    std::ofstream out(filename);
+    out << "nx,ny,nz,E,n2_sum\n";
+    for (const auto& lev : levels) {
+        int nx = std::get<0>(lev);
+        int ny = std::get<1>(lev);
+        int nz = std::get<2>(lev);
+        double E = std::get<3>(lev);
+        out << nx << "," << ny << "," << nz << "," << E << ","
+            << (nx * nx + ny * ny + nz * nz) << "\n";
+    }
+    out.close();
+}
+
+// ============================================================
+// Quantum Well / Wire / Dot
+// ============================================================
+
+// Quantum well: confined in z (width Lz), free in x,y
+double QuantumParticle::computeQuantumWellEnergy(
+    int n, double Lz, double mStar, double kx, double ky)
+{
+    const double hbar = 1.0545718e-34;
+    double Ez = hbar * hbar * M_PI * M_PI * n * n / (2.0 * mStar * Lz * Lz);
+    double Exy = hbar * hbar * (kx * kx + ky * ky) / (2.0 * mStar);
+    return Ez + Exy;
+}
+
+// Quantum wire: confined in y,z (Ly x Lz), free in x
+double QuantumParticle::computeQuantumWireEnergy(
+    int ny, int nz, double Ly, double Lz, double mStar, double kx)
+{
+    const double hbar = 1.0545718e-34;
+    double Eyz = hbar * hbar * M_PI * M_PI / (2.0 * mStar) *
+                 (ny * ny / (Ly * Ly) + nz * nz / (Lz * Lz));
+    double Ex = hbar * hbar * kx * kx / (2.0 * mStar);
+    return Eyz + Ex;
+}
+
+// Quantum dot: confined in all three directions
+double QuantumParticle::computeQuantumDotEnergy(
+    int nx, int ny, int nz, double Lx, double Ly, double Lz, double mStar)
+{
+    const double hbar = 1.0545718e-34;
+    return hbar * hbar * M_PI * M_PI / (2.0 * mStar) *
+           (nx * nx / (Lx * Lx) + ny * ny / (Ly * Ly) + nz * nz / (Lz * Lz));
+}
+
+// 3D harmonic oscillator quantum dot
+double QuantumParticle::computeQuantumDotHOEnergy(
+    int nx, int ny, int nz,
+    double omegaX, double omegaY, double omegaZ, double mStar)
+{
+    (void)mStar;
+    const double hbar = 1.0545718e-34;
+    return hbar * omegaX * (nx + 0.5) + hbar * omegaY * (ny + 0.5) + hbar * omegaZ * (nz + 0.5);
+}
+
+// Export quantum well subband dispersion E_n(k_parallel)
+void QuantumParticle::exportQuantumWellSubbandsCSV(
+    const std::string& filename, double Lz, double mStar, int maxN, int numK)
+{
+    std::ofstream out(filename);
+    out << "k_parallel,n,E\n";
+    const double hbar = 1.0545718e-34;
+    double kMax = 5.0e9; // 1/m
+    for (int ik = 0; ik < numK; ++ik) {
+        double kpar = ik * kMax / (numK - 1);
+        for (int n = 1; n <= maxN; ++n) {
+            double E = computeQuantumWellEnergy(n, Lz, mStar, kpar, 0.0);
+            out << kpar << "," << n << "," << E << "\n";
+        }
+    }
+    out.close();
+}
+
+// ============================================================
+// Central Potential & Spherical Harmonics
+// ============================================================
+
+// Associated Legendre polynomial P_l^m(x) for m >= 0
+double QuantumParticle::associatedLegendre(int l, int m, double x) {
+    if (m < 0 || m > l) return 0.0;
+
+    // P_m^m(x) = (-1)^m (2m-1)!! (1 - x^2)^{m/2}
+    double pmm = 1.0;
+    if (m > 0) {
+        double somx2 = sqrt(1.0 - x * x);
+        double fact = 1.0;
+        for (int i = 1; i <= m; ++i) {
+            pmm *= -fact * somx2;
+            fact += 2.0;
+        }
+    }
+    if (l == m) return pmm;
+
+    // P_{m+1}^m(x) = x (2m+1) P_m^m
+    double pmmp1 = x * (2.0 * m + 1.0) * pmm;
+    if (l == m + 1) return pmmp1;
+
+    // Recurrence: (l-m) P_l^m = x(2l-1) P_{l-1}^m - (l+m-1) P_{l-2}^m
+    double pll = 0.0;
+    for (int ll = m + 2; ll <= l; ++ll) {
+        pll = (x * (2.0 * ll - 1.0) * pmmp1 - (ll + m - 1.0) * pmm) / (ll - m);
+        pmm = pmmp1;
+        pmmp1 = pll;
+    }
+    return pll;
+}
+
+// Spherical harmonic Y_l^m(theta, phi)
+std::complex<double> QuantumParticle::sphericalHarmonic(int l, int m, double theta, double phi) {
+    int absm = (m < 0) ? -m : m;
+
+    // Normalization: sqrt((2l+1)/(4pi) * (l-|m|)!/(l+|m|)!)
+    double factRatio = 1.0;
+    for (int i = l - absm + 1; i <= l + absm; ++i)
+        factRatio *= i;
+    double norm = sqrt((2.0 * l + 1.0) / (4.0 * M_PI) / factRatio);
+
+    double Plm = associatedLegendre(l, absm, cos(theta));
+
+    std::complex<double> result = norm * Plm * std::exp(std::complex<double>(0, absm * phi));
+
+    if (m < 0) {
+        double sign = (absm % 2 == 0) ? 1.0 : -1.0;
+        result = sign * std::conj(result);
+    }
+
+    return result;
+}
+
+// Effective potential: V(r) + hbar^2 l(l+1) / (2mr^2)
+double QuantumParticle::computeEffectivePotential(double r, int l, double Vr) {
+    const double hbar = 1.0545718e-34;
+    if (r < 1e-20) return 1e30; // avoid singularity
+    double centrifugal = hbar * hbar * l * (l + 1) / (2.0 * mass * r * r);
+    return Vr + centrifugal;
+}
+
+// Export V_eff(r) for a spherical well (V=0 inside, infinite outside)
+void QuantumParticle::exportEffectivePotentialCSV(
+    const std::string& filename, int l, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "r,V_eff,V_centrifugal\n";
+    const double hbar = 1.0545718e-34;
+    double rMax = 5.0 * length;
+    double dr = rMax / numPoints;
+    for (int i = 1; i <= numPoints; ++i) {
+        double r = i * dr;
+        double Vcentrifugal = hbar * hbar * l * (l + 1) / (2.0 * mass * r * r);
+        double Veff = Vcentrifugal; // free-space effective potential
+        out << r << "," << Veff << "," << Vcentrifugal << "\n";
+    }
+    out.close();
+}
+
+// Export |Y_l^m(theta, phi)|^2 on a theta-phi grid for all m of a given l
+void QuantumParticle::exportSphericalHarmonicsCSV(
+    const std::string& filename, int l, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "theta,phi,m,ReY,ImY,absY2\n";
+    for (int m = -l; m <= l; ++m) {
+        for (int it = 0; it < numPoints; ++it) {
+            double theta = M_PI * it / (numPoints - 1);
+            for (int ip = 0; ip < numPoints; ++ip) {
+                double phi = 2.0 * M_PI * ip / (numPoints - 1);
+                auto Y = sphericalHarmonic(l, m, theta, phi);
+                double absY2 = std::norm(Y);
+                out << theta << "," << phi << "," << m << ","
+                    << Y.real() << "," << Y.imag() << "," << absY2 << "\n";
+            }
+        }
+    }
+    out.close();
+}
+
+// ============================================================
+// Spherical Infinite Well
+// ============================================================
+
+// Spherical Bessel function j_l(x) via recurrence
+double QuantumParticle::sphericalBesselJ(int l, double x) {
+    if (fabs(x) < 1e-15) {
+        return (l == 0) ? 1.0 : 0.0;
+    }
+    // j_0(x) = sin(x)/x
+    double j0 = sin(x) / x;
+    if (l == 0) return j0;
+
+    // j_1(x) = sin(x)/x^2 - cos(x)/x
+    double j1 = sin(x) / (x * x) - cos(x) / x;
+    if (l == 1) return j1;
+
+    // Recurrence: j_{l+1}(x) = (2l+1)/x * j_l(x) - j_{l-1}(x)
+    double jlm1 = j0;
+    double jl = j1;
+    for (int ll = 1; ll < l; ++ll) {
+        double jlp1 = (2.0 * ll + 1.0) / x * jl - jlm1;
+        jlm1 = jl;
+        jl = jlp1;
+    }
+    return jl;
+}
+
+// Find the n-th zero (n=1,2,3,...) of j_l(x) using bisection
+double QuantumParticle::findBesselZero(int l, int n) {
+    // Scan for sign changes in j_l(x)
+    double dx = 0.1;
+    double xStart = (l == 0) ? 0.1 : (l * 0.5);
+    int zeroCount = 0;
+    double x = xStart;
+    double prevVal = sphericalBesselJ(l, x);
+
+    while (zeroCount < n) {
+        x += dx;
+        double val = sphericalBesselJ(l, x);
+        if (prevVal * val < 0.0) {
+            zeroCount++;
+            if (zeroCount == n) {
+                // Bisection to refine
+                double a = x - dx;
+                double b = x;
+                for (int iter = 0; iter < 100; ++iter) {
+                    double mid = 0.5 * (a + b);
+                    double fmid = sphericalBesselJ(l, mid);
+                    if (sphericalBesselJ(l, a) * fmid < 0.0) {
+                        b = mid;
+                    } else {
+                        a = mid;
+                    }
+                }
+                return 0.5 * (a + b);
+            }
+        }
+        prevVal = val;
+        if (x > 200.0) break; // safety
+    }
+    return 0.0; // not found
+}
+
+// Energy: E_{nl} = hbar^2 g_{nl}^2 / (2 m a^2)
+double QuantumParticle::computeSphericalWellEnergy(int n, int l, double a) {
+    const double hbar = 1.0545718e-34;
+    double gnl = findBesselZero(l, n);
+    return hbar * hbar * gnl * gnl / (2.0 * mass * a * a);
+}
+
+// Export R_{nl}(r) = A_l * j_l(k_{nl} r)
+void QuantumParticle::exportSphericalWellWavefunctionCSV(
+    const std::string& filename, int n, int l, double a, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "r,R_nl,psi_squared_r2\n";
+    double gnl = findBesselZero(l, n);
+    double knl = gnl / a;
+
+    // Numerical normalization: integral of |j_l(k r)|^2 r^2 dr from 0 to a
+    int normN = 1000;
+    double dr = a / normN;
+    double normSum = 0.0;
+    for (int i = 1; i <= normN; ++i) {
+        double r = i * dr;
+        double jl = sphericalBesselJ(l, knl * r);
+        normSum += jl * jl * r * r * dr;
+    }
+    double A = 1.0 / sqrt(normSum);
+
+    dr = a / numPoints;
+    for (int i = 0; i <= numPoints; ++i) {
+        double r = i * dr;
+        double Rnl = (r < 1e-20) ? 0.0 : A * sphericalBesselJ(l, knl * r);
+        out << r << "," << Rnl << "," << (Rnl * Rnl * r * r) << "\n";
+    }
+    out.close();
+}
+
+// Export a table of energy levels for the spherical well
+void QuantumParticle::exportSphericalWellEnergyLevelsCSV(
+    const std::string& filename, double a, int maxN, int maxL)
+{
+    std::ofstream out(filename);
+    out << "n,l,g_nl,E\n";
+    const double hbar = 1.0545718e-34;
+    for (int l = 0; l <= maxL; ++l) {
+        for (int n = 1; n <= maxN; ++n) {
+            double gnl = findBesselZero(l, n);
+            double E = hbar * hbar * gnl * gnl / (2.0 * mass * a * a);
+            out << n << "," << l << "," << gnl << "," << E << "\n";
+        }
+    }
+    out.close();
+}
+
+// ============================================================
+// Two-Body Problem
+// ============================================================
+
+double QuantumParticle::computeReducedMass(double m1, double m2) {
+    return (m1 * m2) / (m1 + m2);
+}
+
+// Coulomb energy with reduced mass: E_n = -mu Z^2 e^4 / (2 hbar^2 (4pi eps0)^2 n^2)
+double QuantumParticle::computeTwoBodyCoulombEnergy(double m1, double m2, int n, double Z) {
+    const double e = 1.602176634e-19;
+    const double epsilon0 = 8.854187817e-12;
+    const double hbar = 1.0545718e-34;
+    double mu = computeReducedMass(m1, m2);
+    double prefactor = -(Z * Z * mu * e * e) / (8.0 * epsilon0 * epsilon0 * hbar * hbar);
+    return prefactor / (n * n);
+}
+
+// Compare infinite-mass nucleus vs. finite-mass two-body
+void QuantumParticle::exportTwoBodyComparisonCSV(
+    const std::string& filename, double m1, double m2, double Z, int maxN)
+{
+    std::ofstream out(filename);
+    out << "n,E_infinite_nucleus,E_two_body,E_CM_term,reduced_mass,total_mass\n";
+    const double e = 1.602176634e-19;
+    const double epsilon0 = 8.854187817e-12;
+    const double hbar = 1.0545718e-34;
+
+    double mu = computeReducedMass(m1, m2);
+    double M = m1 + m2;
+
+    for (int n = 1; n <= maxN; ++n) {
+        // Infinite-nucleus approximation: use electron mass m1
+        double E_inf = -(Z * Z * m1 * e * e) / (8.0 * epsilon0 * epsilon0 * hbar * hbar * n * n);
+        // Two-body with reduced mass
+        double E_two = -(Z * Z * mu * e * e) / (8.0 * epsilon0 * epsilon0 * hbar * hbar * n * n);
+        // CM kinetic energy is separate (free particle, not quantized in bound states)
+        out << n << "," << E_inf << "," << E_two << ",0,"
+            << mu << "," << M << "\n";
     }
     out.close();
 }

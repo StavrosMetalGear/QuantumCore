@@ -34,6 +34,12 @@ int main() {
     std::cout << "14 - Kronig-Penney Model (Band Structure)\n";
     std::cout << "15 - Tight-Binding Model\n";
     std::cout << "16 - Harmonic Oscillator (Full Analysis)\n";
+    std::cout << "17 - Particle in a 2D Box\n";
+    std::cout << "18 - Particle in a 3D Box\n";
+    std::cout << "19 - Quantum Well / Wire / Dot\n";
+    std::cout << "20 - Central Potential & Spherical Harmonics\n";
+    std::cout << "21 - Spherical Infinite Well\n";
+    std::cout << "22 - Two-Body Problem\n";
 
     int choice;
     std::cin >> choice;
@@ -535,6 +541,328 @@ int main() {
                           << "  shift=" << Ei_field - Ei_bare << " J\n";
             }
         }
+    }
+
+    // ===== 17: Particle in a 2D Box =====
+    else if (choice == 17) {
+        std::cout << "\nParticle in a 2D Box\n";
+        int nx, ny;
+        double a, b;
+        std::cout << "Box side a (m): "; std::cin >> a;
+        std::cout << "Box side b (m) [0 = square, a=b]: "; std::cin >> b;
+        if (b == 0.0) b = a;
+        std::cout << "Quantum number nx: "; std::cin >> nx;
+        std::cout << "Quantum number ny: "; std::cin >> ny;
+
+        double E = particle.computeEnergy2DBox(nx, ny, a, b);
+        std::cout << "\nE(" << nx << "," << ny << ") = " << E << " J\n";
+
+        particle.exportWavefunction2DBoxCSV("box2d_wavefunction.csv", nx, ny, a, b, 100);
+        std::cout << "Wavefunction saved to box2d_wavefunction.csv\n";
+
+        if (fabs(a - b) < 1e-30) {
+            std::cout << "\n--- Degeneracy analysis (square box L = " << a << ") ---\n";
+            auto levels = particle.listEnergyLevels2DBox(a, 5);
+            double prevE = -1.0;
+            int degCount = 0;
+            for (size_t i = 0; i < levels.size(); ++i) {
+                double Ei = std::get<2>(levels[i]);
+                if (fabs(Ei - prevE) < Ei * 1e-10) {
+                    degCount++;
+                } else {
+                    if (degCount > 1 && prevE > 0)
+                        std::cout << "    -> degeneracy = " << degCount << "\n";
+                    degCount = 1;
+                    prevE = Ei;
+                }
+                std::cout << "  (" << std::get<0>(levels[i]) << ","
+                          << std::get<1>(levels[i]) << ")  E = " << Ei << " J\n";
+            }
+            if (degCount > 1)
+                std::cout << "    -> degeneracy = " << degCount << "\n";
+
+            particle.exportEnergyLevels2DBoxCSV("box2d_levels.csv", a, 5);
+            std::cout << "Energy levels saved to box2d_levels.csv\n";
+        }
+    }
+
+    // ===== 18: Particle in a 3D Box =====
+    else if (choice == 18) {
+        std::cout << "\nParticle in a 3D Box\n";
+        int nx, ny, nz;
+        double a, b, c;
+        std::cout << "Box side a (m): "; std::cin >> a;
+        std::cout << "Box side b (m) [0 = cubic]: "; std::cin >> b;
+        if (b == 0.0) b = a;
+        std::cout << "Box side c (m) [0 = cubic]: "; std::cin >> c;
+        if (c == 0.0) c = a;
+        std::cout << "nx: "; std::cin >> nx;
+        std::cout << "ny: "; std::cin >> ny;
+        std::cout << "nz: "; std::cin >> nz;
+
+        double E = particle.computeEnergy3DBox(nx, ny, nz, a, b, c);
+        std::cout << "\nE(" << nx << "," << ny << "," << nz << ") = " << E << " J\n";
+
+        double zSlice = c / 2.0;
+        std::cout << "Exporting xy-slice at z = " << zSlice << " m\n";
+        particle.exportWavefunction3DBoxSliceCSV("box3d_wavefunction.csv",
+                                                  nx, ny, nz, a, b, c, zSlice, 50);
+        std::cout << "Wavefunction slice saved to box3d_wavefunction.csv\n";
+
+        if (fabs(a - b) < 1e-30 && fabs(b - c) < 1e-30) {
+            std::cout << "\n--- Degeneracy analysis (cubic box L = " << a << ") ---\n";
+            auto levels = particle.listEnergyLevels3DBox(a, 4);
+            double prevE = -1.0;
+            int degCount = 0;
+            for (size_t i = 0; i < levels.size(); ++i) {
+                double Ei = std::get<3>(levels[i]);
+                if (fabs(Ei - prevE) < Ei * 1e-10) {
+                    degCount++;
+                } else {
+                    if (degCount > 1 && prevE > 0)
+                        std::cout << "    -> degeneracy = " << degCount << "\n";
+                    degCount = 1;
+                    prevE = Ei;
+                }
+                std::cout << "  (" << std::get<0>(levels[i]) << ","
+                          << std::get<1>(levels[i]) << ","
+                          << std::get<2>(levels[i]) << ")  E = " << Ei << " J\n";
+            }
+            if (degCount > 1)
+                std::cout << "    -> degeneracy = " << degCount << "\n";
+
+            particle.exportEnergyLevels3DBoxCSV("box3d_levels.csv", a, 4);
+            std::cout << "Energy levels saved to box3d_levels.csv\n";
+        }
+    }
+
+    // ===== 19: Quantum Well / Wire / Dot =====
+    else if (choice == 19) {
+        std::cout << "\nQuantum Nanostructures\n";
+        std::cout << "1 - Quantum Well (confined in z, free in x,y)\n";
+        std::cout << "2 - Quantum Wire (confined in y,z, free in x)\n";
+        std::cout << "3 - Rectangular Quantum Dot (confined in all 3D)\n";
+        std::cout << "4 - Harmonic Oscillator Quantum Dot (3D HO)\n";
+        std::cout << "Select: ";
+        int qs;
+        std::cin >> qs;
+
+        double mStar;
+        std::cout << "Effective mass m* (kg) [0 = free electron]: ";
+        std::cin >> mStar;
+        if (mStar == 0.0) mStar = 9.11e-31;
+
+        const double hbar = 1.0545718e-34;
+
+        if (qs == 1) {
+            double Lz;
+            int n;
+            std::cout << "Well width Lz (m): "; std::cin >> Lz;
+            std::cout << "Subband index n: "; std::cin >> n;
+
+            double E0 = QuantumParticle::computeQuantumWellEnergy(n, Lz, mStar, 0, 0);
+            std::cout << "\n  Subband energy E_" << n << " = " << E0 << " J"
+                      << " = " << E0 / 1.602176634e-19 << " eV\n";
+            std::cout << "  E(n, k_par) = E_n + hbar^2 k_par^2 / (2 m*)\n";
+
+            particle.exportQuantumWellSubbandsCSV("quantum_well_subbands.csv", Lz, mStar, 5, 200);
+            std::cout << "Subband dispersion saved to quantum_well_subbands.csv\n";
+        }
+        else if (qs == 2) {
+            double Ly, Lz;
+            int ny, nz;
+            std::cout << "Wire height Ly (m): "; std::cin >> Ly;
+            std::cout << "Wire width Lz (m): "; std::cin >> Lz;
+            std::cout << "ny: "; std::cin >> ny;
+            std::cout << "nz: "; std::cin >> nz;
+
+            double E0 = QuantumParticle::computeQuantumWireEnergy(ny, nz, Ly, Lz, mStar, 0);
+            std::cout << "\n  Subband energy E(" << ny << "," << nz << ") = " << E0 << " J"
+                      << " = " << E0 / 1.602176634e-19 << " eV\n";
+            std::cout << "  E(kx, ny, nz) = E_ny_nz + hbar^2 kx^2 / (2 m*)\n";
+        }
+        else if (qs == 3) {
+            double Lx, Ly, Lz;
+            int nx, ny, nz;
+            std::cout << "Lx (m): "; std::cin >> Lx;
+            std::cout << "Ly (m): "; std::cin >> Ly;
+            std::cout << "Lz (m): "; std::cin >> Lz;
+            std::cout << "nx: "; std::cin >> nx;
+            std::cout << "ny: "; std::cin >> ny;
+            std::cout << "nz: "; std::cin >> nz;
+
+            double E = QuantumParticle::computeQuantumDotEnergy(nx, ny, nz, Lx, Ly, Lz, mStar);
+            std::cout << "\n  E(" << nx << "," << ny << "," << nz << ") = " << E << " J"
+                      << " = " << E / 1.602176634e-19 << " eV\n";
+        }
+        else if (qs == 4) {
+            double ox, oy, oz;
+            int nx, ny, nz;
+            std::cout << "omega_x (rad/s): "; std::cin >> ox;
+            std::cout << "omega_y (rad/s): "; std::cin >> oy;
+            std::cout << "omega_z (rad/s): "; std::cin >> oz;
+            std::cout << "nx: "; std::cin >> nx;
+            std::cout << "ny: "; std::cin >> ny;
+            std::cout << "nz: "; std::cin >> nz;
+
+            double E = QuantumParticle::computeQuantumDotHOEnergy(nx, ny, nz, ox, oy, oz, mStar);
+            std::cout << "\n  E = hbar*(omega_x*(nx+1/2) + omega_y*(ny+1/2) + omega_z*(nz+1/2))\n";
+            std::cout << "  E(" << nx << "," << ny << "," << nz << ") = " << E << " J"
+                      << " = " << E / 1.602176634e-19 << " eV\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 20: Central Potential & Spherical Harmonics =====
+    else if (choice == 20) {
+        std::cout << "\nCentral Potential & Spherical Harmonics\n";
+        std::cout << "1 - Spherical harmonics Y_l^m\n";
+        std::cout << "2 - Effective potential V_eff(r)\n";
+        std::cout << "3 - Angular momentum eigenvalues\n";
+        std::cout << "Select: ";
+        int cp;
+        std::cin >> cp;
+
+        if (cp == 1) {
+            int l;
+            std::cout << "Enter l: "; std::cin >> l;
+
+            std::cout << "\nSpherical harmonics for l = " << l << ":\n";
+            std::cout << "  L^2 eigenvalue = hbar^2 * " << l * (l + 1) << "\n";
+            std::cout << "  m ranges from " << -l << " to " << l
+                      << " (" << (2 * l + 1) << " states)\n\n";
+
+            // Show some sample values
+            std::cout << "  Sample Y_l^m(theta=pi/4, phi=0):\n";
+            for (int m = -l; m <= l; ++m) {
+                auto Y = QuantumParticle::sphericalHarmonic(l, m, M_PI / 4.0, 0.0);
+                std::cout << "    m=" << m << "  Y = (" << Y.real() << ", " << Y.imag()
+                          << ")  |Y|^2 = " << std::norm(Y) << "\n";
+            }
+
+            particle.exportSphericalHarmonicsCSV("spherical_harmonics.csv", l, 50);
+            std::cout << "Spherical harmonics saved to spherical_harmonics.csv\n";
+        }
+        else if (cp == 2) {
+            int l;
+            std::cout << "Enter angular momentum l: "; std::cin >> l;
+
+            const double hbar = 1.0545718e-34;
+            std::cout << "\nEffective potential: V_eff(r) = V(r) + hbar^2 l(l+1) / (2mr^2)\n";
+            std::cout << "  Centrifugal term coefficient = hbar^2 * " << l * (l + 1)
+                      << " / (2m) = "
+                      << hbar * hbar * l * (l + 1) / (2.0 * particle.mass) << " J*m^2\n";
+
+            particle.exportEffectivePotentialCSV("effective_potential.csv", l, 500);
+            std::cout << "Effective potential saved to effective_potential.csv\n";
+        }
+        else if (cp == 3) {
+            int lMax;
+            std::cout << "Max l: "; std::cin >> lMax;
+
+            const double hbar = 1.0545718e-34;
+            std::cout << "\nAngular momentum eigenvalues:\n";
+            std::cout << "  L^2 |l,m> = hbar^2 l(l+1) |l,m>\n";
+            std::cout << "  L_z |l,m> = hbar m |l,m>\n\n";
+            for (int l = 0; l <= lMax; ++l) {
+                std::cout << "  l=" << l
+                          << "  L^2 = " << hbar * hbar * l * (l + 1) << " J^2*s^2"
+                          << "  |L| = " << hbar * sqrt((double)l * (l + 1)) << " J*s"
+                          << "  degeneracy = " << (2 * l + 1) << "\n";
+            }
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 21: Spherical Infinite Well =====
+    else if (choice == 21) {
+        std::cout << "\nSpherical Infinite Potential Well\n";
+        double a;
+        std::cout << "Well radius a (m): "; std::cin >> a;
+
+        int maxN, maxL;
+        std::cout << "Max radial quantum number n: "; std::cin >> maxN;
+        std::cout << "Max angular momentum l: "; std::cin >> maxL;
+
+        const double hbar = 1.0545718e-34;
+
+        std::cout << "\nEnergy levels E_{nl} = hbar^2 g_{nl}^2 / (2ma^2)\n";
+        std::cout << "where g_{nl} is the n-th zero of j_l(x)\n\n";
+
+        for (int l = 0; l <= maxL; ++l) {
+            for (int n = 1; n <= maxN; ++n) {
+                double gnl = QuantumParticle::findBesselZero(l, n);
+                double E = particle.computeSphericalWellEnergy(n, l, a);
+                std::cout << "  n=" << n << " l=" << l
+                          << "  g_{nl}=" << gnl
+                          << "  E = " << E << " J"
+                          << " = " << E / 1.602176634e-19 << " eV\n";
+            }
+        }
+
+        // Export wavefunction for specific state
+        std::cout << "\nExport wavefunction? Enter n l [0 0 to skip]: ";
+        int en, el;
+        std::cin >> en >> el;
+        if (en > 0) {
+            particle.exportSphericalWellWavefunctionCSV(
+                "spherical_well_wavefunction.csv", en, el, a, 200);
+            std::cout << "Wavefunction R_{" << en << "," << el
+                      << "} saved to spherical_well_wavefunction.csv\n";
+        }
+
+        particle.exportSphericalWellEnergyLevelsCSV(
+            "spherical_well_levels.csv", a, maxN, maxL);
+        std::cout << "Energy levels saved to spherical_well_levels.csv\n";
+    }
+
+    // ===== 22: Two-Body Problem =====
+    else if (choice == 22) {
+        std::cout << "\nTwo-Body Problem\n";
+        std::cout << "Separation into center-of-mass and relative coordinates\n\n";
+
+        double m1, m2, Z;
+        std::cout << "Mass m1 (kg) [0 = electron]: "; std::cin >> m1;
+        if (m1 == 0.0) m1 = 9.11e-31;
+        std::cout << "Mass m2 (kg) [0 = proton]: "; std::cin >> m2;
+        if (m2 == 0.0) m2 = 1.67262192e-27;
+        std::cout << "Atomic number Z: "; std::cin >> Z;
+
+        double mu = QuantumParticle::computeReducedMass(m1, m2);
+        double M = m1 + m2;
+
+        std::cout << "\n--- Masses ---\n";
+        std::cout << "  m1 = " << m1 << " kg\n";
+        std::cout << "  m2 = " << m2 << " kg\n";
+        std::cout << "  Total mass M = m1 + m2 = " << M << " kg\n";
+        std::cout << "  Reduced mass mu = m1*m2/(m1+m2) = " << mu << " kg\n";
+        std::cout << "  mu / m_e = " << mu / 9.11e-31 << "\n";
+
+        std::cout << "\n--- Coulomb energy levels (with reduced mass) ---\n";
+        std::cout << "  E_n = -mu Z^2 e^4 / (2 hbar^2 (4pi eps0)^2 n^2)\n\n";
+
+        int maxN;
+        std::cout << "Max principal quantum number n: "; std::cin >> maxN;
+
+        for (int n = 1; n <= maxN; ++n) {
+            double E_inf = particle.computeCoulombEnergy(n, Z);
+            double E_two = particle.computeTwoBodyCoulombEnergy(m1, m2, n, Z);
+            std::cout << "  n=" << n
+                      << "  E(m_e) = " << E_inf << " J"
+                      << "  E(mu) = " << E_two << " J"
+                      << "  ratio = " << E_two / E_inf << "\n";
+        }
+
+        std::cout << "\nNote: The center-of-mass moves freely:\n";
+        std::cout << "  Psi(R,r) = u(R) * psi(r)\n";
+        std::cout << "  u(R) = C * exp(i K . R),  E_CM = hbar^2 K^2 / (2M)\n";
+
+        particle.exportTwoBodyComparisonCSV("two_body_comparison.csv", m1, m2, Z, maxN);
+        std::cout << "Comparison saved to two_body_comparison.csv\n";
     }
 
     return 0;

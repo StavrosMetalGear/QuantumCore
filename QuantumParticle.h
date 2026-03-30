@@ -4,6 +4,7 @@
 #include <vector>
 #include <complex>
 #include <utility>
+#include <tuple>
 
 class QuantumParticle {
 public:
@@ -97,6 +98,47 @@ public:
     double tightBindingEffectiveMass(double t, double a);
     void exportTightBindingDispersionCSV(
         const std::string& filename, double E0, double t, double a, int numK);
+
+    // ===== 2D Box =====
+    double computeEnergy2DBox(int nx, int ny, double a, double b);
+    void exportWavefunction2DBoxCSV(const std::string& filename, int nx, int ny,
+                                    double a, double b, int numPoints);
+    std::vector<std::tuple<int, int, double>> listEnergyLevels2DBox(double L, int maxN);
+    void exportEnergyLevels2DBoxCSV(const std::string& filename, double L, int maxN);
+
+    // ===== 3D Box =====
+    double computeEnergy3DBox(int nx, int ny, int nz, double a, double b, double c);
+    void exportWavefunction3DBoxSliceCSV(const std::string& filename, int nx, int ny, int nz,
+                                         double a, double b, double c, double zSlice, int numPoints);
+    std::vector<std::tuple<int, int, int, double>> listEnergyLevels3DBox(double L, int maxN);
+    void exportEnergyLevels3DBoxCSV(const std::string& filename, double L, int maxN);
+
+    // ===== Quantum Well / Wire / Dot =====
+    static double computeQuantumWellEnergy(int n, double Lz, double mStar, double kx, double ky);
+    static double computeQuantumWireEnergy(int ny, int nz, double Ly, double Lz, double mStar, double kx);
+    static double computeQuantumDotEnergy(int nx, int ny, int nz, double Lx, double Ly, double Lz, double mStar);
+    static double computeQuantumDotHOEnergy(int nx, int ny, int nz,
+                                            double omegaX, double omegaY, double omegaZ, double mStar);
+    void exportQuantumWellSubbandsCSV(const std::string& filename, double Lz, double mStar, int maxN, int numK);
+
+    // ===== Central Potential & Spherical Harmonics =====
+    static double associatedLegendre(int l, int m, double x);
+    static std::complex<double> sphericalHarmonic(int l, int m, double theta, double phi);
+    double computeEffectivePotential(double r, int l, double Vr);
+    void exportEffectivePotentialCSV(const std::string& filename, int l, int numPoints);
+    void exportSphericalHarmonicsCSV(const std::string& filename, int l, int numPoints);
+
+    // ===== Spherical Infinite Well =====
+    static double sphericalBesselJ(int l, double x);
+    static double findBesselZero(int l, int n);
+    double computeSphericalWellEnergy(int n, int l, double a);
+    void exportSphericalWellWavefunctionCSV(const std::string& filename, int n, int l, double a, int numPoints);
+    void exportSphericalWellEnergyLevelsCSV(const std::string& filename, double a, int maxN, int maxL);
+
+    // ===== Two-Body Problem =====
+    static double computeReducedMass(double m1, double m2);
+    double computeTwoBodyCoulombEnergy(double m1, double m2, int n, double Z);
+    void exportTwoBodyComparisonCSV(const std::string& filename, double m1, double m2, double Z, int maxN);
 
 };
 
