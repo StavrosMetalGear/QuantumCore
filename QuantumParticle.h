@@ -172,6 +172,22 @@ public:
     void exportCoupledStatesCSV(const std::string& filename, double j1, double j2);
     void exportSingletTripletCSV(const std::string& filename);
 
+    // ===== Non-Degenerate Perturbation Theory =====
+    double matrixElementISW(int m, int n);
+    double starkISWFirstOrder(int n, double electricField);
+    double starkISWSecondOrder(int n, double electricField, int maxTerms);
+    static double starkHOSecondOrder(double electricField, double mParticle, double omega);
+    static std::pair<double, double> twoLevelPerturbation(double delta, double Omega);
+    static std::pair<double, double> twoLevelExact(double delta, double Omega);
+    void exportStarkISWCSV(const std::string& filename, double electricField, int maxN, int maxTerms);
+    void exportStarkHOCSV(const std::string& filename, double omega, double electricField, int maxN);
+    void exportTwoLevelComparisonCSV(const std::string& filename, double delta, int numPoints);
+
+    // ===== Degenerate Perturbation Theory =====
+    static std::pair<double, double> degenerateTwoLevel(double E0, double Omega);
+    static std::pair<double, double> diagonalize2x2(double H11, double H22, std::complex<double> H12);
+    void exportDegenerateTwoLevelCSV(const std::string& filename, double E0, double OmegaMax, int numPoints);
+
 };
 
 

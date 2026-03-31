@@ -1607,3 +1607,155 @@ void QuantumParticle::exportSingletTripletCSV(const std::string& filename) {
 
     out.close();
 }
+
+// ============================================================
+// Non-Degenerate Perturbation Theory
+// ============================================================
+
+// Matrix element <m|x|n> for the infinite square well on [0, L]
+// psi_n(x) = sqrt(2/L) sin(n*pi*x/L)
+double QuantumParticle::matrixElementISW(int m, int n) {
+    double L = length;
+    if (m == n) {
+        return L / 2.0;
+    }
+    // Nonzero only when m+n is odd (different parity)
+    if ((m + n) % 2 == 0) {
+        return 0.0;
+    }
+    // <m|x|n> = (-2L/pi^2) * [1/(m-n)^2 - 1/(m+n)^2]
+    double diff = (double)(m - n);
+    double sum = (double)(m + n);
+    return (-2.0 * L / (M_PI * M_PI)) * (1.0 / (diff * diff) - 1.0 / (sum * sum));
+}
+
+// First-order energy correction: E_n^(1) = e*E0*<n|x|n> = e*E0*L/2
+double QuantumParticle::starkISWFirstOrder(int n, double electricField) {
+    const double e = 1.602176634e-19;
+    return e * electricField * length / 2.0;
+}
+
+// Second-order energy correction: E_n^(2) = sum_{m!=n} |<m|H1|n>|^2 / (E_n^(0) - E_m^(0))
+double QuantumParticle::starkISWSecondOrder(int n, double electricField, int maxTerms) {
+    const double hbar = 1.0545718e-34;
+    const double e = 1.602176634e-19;
+    double L = length;
+    double En0 = (hbar * hbar * M_PI * M_PI * n * n) / (2.0 * mass * L * L);
+
+    double sum = 0.0;
+    for (int m = 1; m <= maxTerms; ++m) {
+        if (m == n) continue;
+        double xmn = matrixElementISW(m, n);
+        if (fabs(xmn) < 1e-50) continue;
+        double Em0 = (hbar * hbar * M_PI * M_PI * m * m) / (2.0 * mass * L * L);
+        double H1mn = e * electricField * xmn;
+        sum += (H1mn * H1mn) / (En0 - Em0);
+    }
+    return sum;
+}
+
+// Harmonic oscillator Stark effect: E_n^(2) = -e^2 E^2 / (2 m omega^2)
+double QuantumParticle::starkHOSecondOrder(double electricField, double mParticle, double omega) {
+    const double e = 1.602176634e-19;
+    return -(e * e * electricField * electricField) / (2.0 * mParticle * omega * omega);
+}
+
+// Two-level system perturbation theory
+// H0 = hbar * diag(delta/2, -delta/2), H1 = hbar * [[0, Omega/2],[Omega/2, 0]]
+// E1 ≈ hbar*delta/2 + hbar*Omega^2/(4*delta)
+// E2 ≈ -hbar*delta/2 - hbar*Omega^2/(4*delta)
+std::pair<double, double> QuantumParticle::twoLevelPerturbation(double delta, double Omega) {
+    const double hbar = 1.0545718e-34;
+    double E1 = hbar * delta / 2.0 + hbar * Omega * Omega / (4.0 * delta);
+    double E2 = -hbar * delta / 2.0 - hbar * Omega * Omega / (4.0 * delta);
+    return {E1, E2};
+}
+
+// Two-level system exact eigenvalues: E_± = ±(hbar/2)*sqrt(delta^2 + Omega^2)
+std::pair<double, double> QuantumParticle::twoLevelExact(double delta, double Omega) {
+    const double hbar = 1.0545718e-34;
+    double E = (hbar / 2.0) * sqrt(delta * delta + Omega * Omega);
+    return {E, -E};
+}
+
+void QuantumParticle::exportStarkISWCSV(
+    const std::string& filename, double electricField, int maxN, int maxTerms)
+{
+    std::ofstream out(filename);
+    out << "n,E0,E1_correction,E2_correction,E_total\n";
+    for (int n = 1; n <= maxN; ++n) {
+        double E0n = computeEnergy1DBox(n);
+        double E1n = starkISWFirstOrder(n, electricField);
+        double E2n = starkISWSecondOrder(n, electricField, maxTerms);
+        out << n << "," << E0n << "," << E1n << "," << E2n
+            << "," << (E0n + E1n + E2n) << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportStarkHOCSV(
+    const std::string& filename, double omega, double electricField, int maxN)
+{
+    const double hbar = 1.0545718e-34;
+    std::ofstream out(filename);
+    out << "n,E0,E1_correction,E2_correction,E_total\n";
+    double E2 = starkHOSecondOrder(electricField, mass, omega);
+    for (int n = 0; n <= maxN; ++n) {
+        double E0n = hbar * omega * (n + 0.5);
+        out << n << "," << E0n << ",0," << E2 << "," << (E0n + E2) << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportTwoLevelComparisonCSV(
+    const std::string& filename, double delta, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "Omega_over_delta,E1_pert,E2_pert,E1_exact,E2_exact\n";
+    for (int i = 1; i <= numPoints; ++i) {
+        double ratio = 2.0 * i / numPoints;
+        double Omega = ratio * delta;
+        auto [Ep1, Ep2] = twoLevelPerturbation(delta, Omega);
+        auto [Ee1, Ee2] = twoLevelExact(delta, Omega);
+        out << ratio << "," << Ep1 << "," << Ep2 << ","
+            << Ee1 << "," << Ee2 << "\n";
+    }
+    out.close();
+}
+
+// ============================================================
+// Degenerate Perturbation Theory
+// ============================================================
+
+// Degenerate two-level: H0 = E0*I, H1 = (hbar/2)*[[0,Omega],[Omega,0]]
+// E_± = E0 ± hbar*Omega/2
+std::pair<double, double> QuantumParticle::degenerateTwoLevel(double E0, double Omega) {
+    const double hbar = 1.0545718e-34;
+    return {E0 + hbar * Omega / 2.0, E0 - hbar * Omega / 2.0};
+}
+
+// General 2x2 Hermitian matrix diagonalization
+// [[H11, H12], [H12*, H22]]
+// Eigenvalues: (H11+H22)/2 ± sqrt(((H11-H22)/2)^2 + |H12|^2)
+std::pair<double, double> QuantumParticle::diagonalize2x2(
+    double H11, double H22, std::complex<double> H12)
+{
+    double avg = (H11 + H22) / 2.0;
+    double diff = (H11 - H22) / 2.0;
+    double disc = sqrt(diff * diff + std::norm(H12));
+    return {avg + disc, avg - disc};
+}
+
+void QuantumParticle::exportDegenerateTwoLevelCSV(
+    const std::string& filename, double E0, double OmegaMax, int numPoints)
+{
+    const double hbar = 1.0545718e-34;
+    std::ofstream out(filename);
+    out << "Omega,E_plus,E_minus,splitting\n";
+    for (int i = 0; i <= numPoints; ++i) {
+        double Omega = OmegaMax * i / numPoints;
+        auto [Ep, Em] = degenerateTwoLevel(E0, Omega);
+        out << Omega << "," << Ep << "," << Em << "," << (Ep - Em) << "\n";
+    }
+    out.close();
+}

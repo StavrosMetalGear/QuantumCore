@@ -43,6 +43,8 @@ int main() {
     std::cout << "23 - Orbital Angular Momentum\n";
     std::cout << "24 - Spin-1/2 System\n";
     std::cout << "25 - Addition of Angular Momentum\n";
+    std::cout << "26 - Non-Degenerate Perturbation Theory\n";
+    std::cout << "27 - Degenerate Perturbation Theory\n";
 
     int choice;
     std::cin >> choice;
@@ -1177,6 +1179,229 @@ int main() {
 
             particle.exportSingletTripletCSV("singlet_triplet.csv");
             std::cout << "\nSinglet/triplet states saved to singlet_triplet.csv\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 26: Non-Degenerate Perturbation Theory =====
+    else if (choice == 26) {
+        std::cout << "\nNon-Degenerate Perturbation Theory\n";
+        std::cout << "1 - Stark effect in infinite square well\n";
+        std::cout << "2 - Stark effect in harmonic oscillator\n";
+        std::cout << "3 - Two-level system (perturbative vs exact)\n";
+        std::cout << "Select: ";
+        int pt;
+        std::cin >> pt;
+
+        const double hbar = 1.0545718e-34;
+        const double eCharge = 1.602176634e-19;
+
+        if (pt == 1) {
+            std::cout << "\n--- Stark Effect in Infinite Square Well ---\n";
+            std::cout << "H = H0 + H1,  H1 = e*E0*x\n";
+            std::cout << "psi_n(x) = sqrt(2/L) sin(n*pi*x/L),  E_n^(0) = hbar^2*pi^2*n^2/(2mL^2)\n\n";
+
+            double E0field;
+            int maxN, maxTerms;
+            std::cout << "Electric field E0 (V/m): "; std::cin >> E0field;
+            std::cout << "Number of energy levels to compute: "; std::cin >> maxN;
+            std::cout << "Max terms in 2nd-order sum [50]: "; std::cin >> maxTerms;
+            if (maxTerms <= 0) maxTerms = 50;
+
+            double L = particle.length;
+
+            std::cout << "\n  First-order correction: E_n^(1) = e*E0*L/2 = "
+                      << eCharge * E0field * L / 2.0 << " J  (same for all n)\n\n";
+
+            std::cout << "  n    E^(0) [J]          E^(1) [J]          E^(2) [J]          E_total [J]\n";
+            std::cout << "  ---- -------------------- -------------------- -------------------- --------------------\n";
+            for (int n = 1; n <= maxN; ++n) {
+                double E0n = particle.computeEnergy1DBox(n);
+                double E1n = particle.starkISWFirstOrder(n, E0field);
+                double E2n = particle.starkISWSecondOrder(n, E0field, maxTerms);
+                std::cout << "  " << n << "    " << E0n << "    " << E1n
+                          << "    " << E2n << "    " << (E0n + E1n + E2n) << "\n";
+            }
+
+            std::cout << "\n--- Key matrix elements <m|x|n> (non-zero only when m+n is odd) ---\n";
+            int showN = (std::min)(maxN, 5);
+            for (int n = 1; n <= showN; ++n) {
+                for (int m = 1; m <= showN; ++m) {
+                    double xmn = particle.matrixElementISW(m, n);
+                    if (fabs(xmn) > 1e-30) {
+                        std::cout << "  <" << m << "|x|" << n << "> = " << xmn << " m\n";
+                    }
+                }
+            }
+
+            particle.exportStarkISWCSV("stark_isw.csv", E0field, maxN, maxTerms);
+            std::cout << "\nPerturbation results saved to stark_isw.csv\n";
+        }
+        else if (pt == 2) {
+            std::cout << "\n--- Stark Effect in Harmonic Oscillator ---\n";
+            std::cout << "H = p^2/(2m) + (1/2)m*omega^2*x^2 + e*E*x\n";
+            std::cout << "E_n^(1) = 0 (by parity)\n";
+            std::cout << "E_n^(2) = -e^2*E^2/(2m*omega^2)  [independent of n]\n\n";
+
+            double omega, E0field;
+            int maxN;
+            std::cout << "Angular frequency omega (rad/s): "; std::cin >> omega;
+            std::cout << "Electric field E (V/m): "; std::cin >> E0field;
+            std::cout << "Max quantum number n: "; std::cin >> maxN;
+
+            double E2 = QuantumParticle::starkHOSecondOrder(E0field, particle.mass, omega);
+            std::cout << "\n  Second-order shift: E^(2) = " << E2 << " J\n";
+            std::cout << "  (This is the exact result from completing the square)\n\n";
+
+            std::cout << "  n    E^(0) [J]          E_corrected [J]     shift [J]\n";
+            std::cout << "  ---- -------------------- -------------------- --------------------\n";
+            for (int n = 0; n <= maxN; ++n) {
+                double E0n = hbar * omega * (n + 0.5);
+                double Ecorr = E0n + E2;
+                std::cout << "  " << n << "    " << E0n << "    " << Ecorr
+                          << "    " << E2 << "\n";
+            }
+
+            std::cout << "\n  Note: spacings are unchanged (shift is n-independent)\n";
+            std::cout << "  E_{n+1} - E_n = hbar*omega = " << hbar * omega << " J\n";
+
+            particle.exportStarkHOCSV("stark_ho.csv", omega, E0field, maxN);
+            std::cout << "\nResults saved to stark_ho.csv\n";
+        }
+        else if (pt == 3) {
+            std::cout << "\n--- Two-Level System ---\n";
+            std::cout << "H0 = hbar * diag(delta/2, -delta/2)\n";
+            std::cout << "H1 = hbar * [[0, Omega/2], [Omega/2, 0]]\n\n";
+
+            double delta, Omega;
+            std::cout << "Detuning delta (rad/s): "; std::cin >> delta;
+            std::cout << "Coupling Omega (rad/s): "; std::cin >> Omega;
+
+            auto [Ep1, Ep2] = QuantumParticle::twoLevelPerturbation(delta, Omega);
+            auto [Ee1, Ee2] = QuantumParticle::twoLevelExact(delta, Omega);
+
+            std::cout << "\n--- Perturbative Results (Omega << delta) ---\n";
+            std::cout << "  E1^(0) = hbar*delta/2 = " << hbar * delta / 2.0 << " J\n";
+            std::cout << "  E2^(0) = -hbar*delta/2 = " << -hbar * delta / 2.0 << " J\n";
+            std::cout << "  E1^(1) = E2^(1) = 0  (diagonal elements of H1 vanish)\n";
+            std::cout << "  E1^(2) = hbar*Omega^2/(4*delta) = "
+                      << hbar * Omega * Omega / (4.0 * delta) << " J\n";
+            std::cout << "  E2^(2) = -hbar*Omega^2/(4*delta) = "
+                      << -hbar * Omega * Omega / (4.0 * delta) << " J\n";
+            std::cout << "\n  E1 (pert) = " << Ep1 << " J\n";
+            std::cout << "  E2 (pert) = " << Ep2 << " J\n";
+
+            std::cout << "\n--- Exact Results ---\n";
+            std::cout << "  E+ = (hbar/2)*sqrt(delta^2 + Omega^2)\n";
+            std::cout << "  E1 (exact) = " << Ee1 << " J\n";
+            std::cout << "  E2 (exact) = " << Ee2 << " J\n";
+
+            std::cout << "\n--- Comparison ---\n";
+            std::cout << "  |E1_pert - E1_exact| = " << fabs(Ep1 - Ee1) << " J\n";
+            std::cout << "  |E2_pert - E2_exact| = " << fabs(Ep2 - Ee2) << " J\n";
+            std::cout << "  Omega/delta = " << Omega / delta
+                      << "  (perturbation valid when << 1)\n";
+
+            std::cout << "\n--- First-Order Corrected Eigenstates ---\n";
+            double mix = Omega / (2.0 * delta);
+            std::cout << "  |psi1> = |1^(0)> + (" << mix << ")|2^(0)>\n";
+            std::cout << "  |psi2> = -(" << mix << ")|1^(0)> + |2^(0)>\n";
+
+            particle.exportTwoLevelComparisonCSV("two_level_comparison.csv", delta, 200);
+            std::cout << "\nComparison saved to two_level_comparison.csv\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 27: Degenerate Perturbation Theory =====
+    else if (choice == 27) {
+        std::cout << "\nDegenerate Perturbation Theory\n";
+        std::cout << "1 - General formalism\n";
+        std::cout << "2 - Degenerate two-level example\n";
+        std::cout << "3 - General 2x2 perturbation matrix\n";
+        std::cout << "Select: ";
+        int dp;
+        std::cin >> dp;
+
+        const double hbar = 1.0545718e-34;
+
+        if (dp == 1) {
+            std::cout << "\n--- Degenerate Perturbation Theory ---\n";
+            std::cout << "When E_n^(0) = E_m^(0), the non-degenerate formula\n";
+            std::cout << "  c_m^(1) = <m|H1|n> / (E_n^(0) - E_m^(0))\n";
+            std::cout << "diverges! Must diagonalize H1 within the degenerate subspace.\n\n";
+
+            std::cout << "--- Procedure ---\n";
+            std::cout << "1. Identify the P_n-fold degenerate subspace {|n,r>}, r=1..P_n\n";
+            std::cout << "2. Form the perturbation matrix: W_rr' = <n,r'|H1|n,r>\n";
+            std::cout << "3. Diagonalize W to find first-order energy shifts\n";
+            std::cout << "4. The secular equation: det(W - E*I) = 0\n";
+            std::cout << "5. Eigenvectors give the 'good' zeroth-order states\n\n";
+
+            std::cout << "--- For two-fold degeneracy (2x2 case) ---\n";
+            std::cout << "  W = [[W_aa, W_ab], [W_ba, W_bb]]\n";
+            std::cout << "  Eigenvalues: E_+/- = (W_aa + W_bb)/2\n";
+            std::cout << "               +/- sqrt(((W_aa - W_bb)/2)^2 + |W_ab|^2)\n";
+        }
+        else if (dp == 2) {
+            std::cout << "\n--- Degenerate Two-Level Example ---\n";
+            std::cout << "H0 = E0 * I  (two-fold degeneracy)\n";
+            std::cout << "H1 = (hbar/2) * [[0, Omega], [Omega, 0]]\n\n";
+
+            double E0, Omega;
+            std::cout << "Unperturbed energy E0 (J): "; std::cin >> E0;
+            std::cout << "Coupling Omega (rad/s): "; std::cin >> Omega;
+
+            auto [Ep, Em] = QuantumParticle::degenerateTwoLevel(E0, Omega);
+
+            std::cout << "\n--- Results ---\n";
+            std::cout << "  Perturbation lifts the degeneracy:\n";
+            std::cout << "  E_+ = E0 + hbar*Omega/2 = " << Ep << " J\n";
+            std::cout << "  E_- = E0 - hbar*Omega/2 = " << Em << " J\n";
+            std::cout << "  Splitting = hbar*Omega = " << hbar * Omega << " J\n";
+            std::cout << "            = " << hbar * Omega / 1.602176634e-19 << " eV\n\n";
+
+            std::cout << "--- Eigenstates (symmetric/antisymmetric) ---\n";
+            std::cout << "  |psi_+> = (1/sqrt(2)) |1^(0)> + (1/sqrt(2)) |2^(0)>\n";
+            std::cout << "  |psi_-> = (1/sqrt(2)) |1^(0)> - (1/sqrt(2)) |2^(0)>\n";
+
+            double OmegaMax = Omega * 3.0;
+            if (OmegaMax < 1.0) OmegaMax = Omega + 1e12;
+            particle.exportDegenerateTwoLevelCSV("degenerate_two_level.csv", E0, OmegaMax, 200);
+            std::cout << "\nLevel splitting saved to degenerate_two_level.csv\n";
+        }
+        else if (dp == 3) {
+            std::cout << "\n--- General 2x2 Perturbation Matrix ---\n";
+            std::cout << "Diagonalize W = [[W11, W12], [W12*, W22]] in the degenerate subspace\n\n";
+
+            double W11, W22, W12r, W12i;
+            std::cout << "W11 (J): "; std::cin >> W11;
+            std::cout << "W22 (J): "; std::cin >> W22;
+            std::cout << "W12 real part (J): "; std::cin >> W12r;
+            std::cout << "W12 imag part (J): "; std::cin >> W12i;
+
+            std::complex<double> W12(W12r, W12i);
+            auto [E1, E2] = QuantumParticle::diagonalize2x2(W11, W22, W12);
+
+            std::cout << "\n--- First-Order Energy Corrections ---\n";
+            std::cout << "  E_+ = " << E1 << " J\n";
+            std::cout << "  E_- = " << E2 << " J\n";
+            std::cout << "  Splitting = " << (E1 - E2) << " J\n";
+
+            double trace = W11 + W22;
+            double discrim = sqrt((W11 - W22) * (W11 - W22) / 4.0 + std::norm(W12));
+            std::cout << "\n  Trace/2 = " << trace / 2.0 << " J\n";
+            std::cout << "  Discriminant = " << discrim << " J\n";
+
+            if (fabs(W11 - W22) < 1e-30 && fabs(W12i) < 1e-30) {
+                std::cout << "\n  Eigenstates (W11 = W22, W12 real):\n";
+                std::cout << "    |+> = (1/sqrt(2))(|1> + |2>)\n";
+                std::cout << "    |-> = (1/sqrt(2))(|1> - |2>)\n";
+            }
         }
         else {
             std::cout << "Invalid selection.\n";
