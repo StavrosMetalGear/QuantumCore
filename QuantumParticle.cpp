@@ -1759,3 +1759,178 @@ void QuantumParticle::exportDegenerateTwoLevelCSV(
     }
     out.close();
 }
+
+// ===== Identical Particles & Exchange Symmetry =====
+
+double QuantumParticle::twoParticleISW(int nA, int nB, double x1, double x2, bool symmetric) {
+    double L = length;
+    double norm = 2.0 / L; // (sqrt(2/L))^2
+    double psiA1 = sqrt(2.0 / L) * sin(nA * M_PI * x1 / L);
+    double psiB2 = sqrt(2.0 / L) * sin(nB * M_PI * x2 / L);
+    double psiA2 = sqrt(2.0 / L) * sin(nA * M_PI * x2 / L);
+    double psiB1 = sqrt(2.0 / L) * sin(nB * M_PI * x1 / L);
+
+    double invSqrt2 = 1.0 / sqrt(2.0);
+    if (symmetric) {
+        return invSqrt2 * (psiA1 * psiB2 + psiA2 * psiB1);
+    }
+    else {
+        return invSqrt2 * (psiA1 * psiB2 - psiA2 * psiB1);
+    }
+}
+
+void QuantumParticle::exportTwoParticleISWCSV(const std::string& filename, int nA, int nB, int numPoints) {
+    std::ofstream out(filename);
+    out << "x1,x2,psi_symmetric,psi_antisymmetric,prob_sym,prob_antisym\n";
+    double L = length;
+    double dx = L / (numPoints - 1);
+    for (int i = 0; i < numPoints; ++i) {
+        double x1 = i * dx;
+        for (int j = 0; j < numPoints; ++j) {
+            double x2 = j * dx;
+            double psiS = twoParticleISW(nA, nB, x1, x2, true);
+            double psiA = twoParticleISW(nA, nB, x1, x2, false);
+            out << x1 << "," << x2 << "," << psiS << "," << psiA
+                << "," << psiS * psiS << "," << psiA * psiA << "\n";
+        }
+    }
+    out.close();
+}
+
+double QuantumParticle::determinantNxN(const std::vector<std::vector<double>>& matrix, int n) {
+    if (n == 1) return matrix[0][0];
+    if (n == 2) return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+
+    double det = 0.0;
+    for (int col = 0; col < n; ++col) {
+        // Build (n-1)x(n-1) minor
+        std::vector<std::vector<double>> minor(n - 1, std::vector<double>(n - 1));
+        for (int i = 1; i < n; ++i) {
+            int mCol = 0;
+            for (int j = 0; j < n; ++j) {
+                if (j == col) continue;
+                minor[i - 1][mCol] = matrix[i][j];
+                mCol++;
+            }
+        }
+        double sign = (col % 2 == 0) ? 1.0 : -1.0;
+        det += sign * matrix[0][col] * determinantNxN(minor, n - 1);
+    }
+    return det;
+}
+
+double QuantumParticle::slaterDeterminantISW(const std::vector<int>& orbitals,
+                                              const std::vector<double>& positions) {
+    int N = (int)orbitals.size();
+    double L = length;
+
+    // Build NxN matrix: M[i][j] = psi_{orbitals[j]}(positions[i])
+    std::vector<std::vector<double>> M(N, std::vector<double>(N));
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            M[i][j] = sqrt(2.0 / L) * sin(orbitals[j] * M_PI * positions[i] / L);
+        }
+    }
+
+    double det = determinantNxN(M, N);
+    // Normalize by 1/sqrt(N!)
+    double nFact = 1.0;
+    for (int i = 2; i <= N; ++i) nFact *= i;
+    return det / sqrt(nFact);
+}
+
+double QuantumParticle::freeElectronGroundStateEnergy(int numElectrons) {
+    const double hbar = 1.0545718e-34;
+    double L = length;
+    double prefactor = (hbar * hbar * M_PI * M_PI) / (2.0 * mass * L * L);
+
+    double totalE = 0.0;
+    int filled = 0;
+    int n = 1;
+    while (filled < numElectrons) {
+        int occ = (std::min)(2, numElectrons - filled);
+        totalE += occ * prefactor * n * n;
+        filled += occ;
+        n++;
+    }
+    return totalE;
+}
+
+std::pair<double, double> QuantumParticle::freeElectronTransition(int numElectrons) {
+    const double hbar = 1.0545718e-34;
+    const double h = 6.62607015e-34;
+    const double c = 2.99792458e8;
+    double L = length;
+    double prefactor = (hbar * hbar * M_PI * M_PI) / (2.0 * mass * L * L);
+
+    int nHOMO = (numElectrons + 1) / 2;
+    int nLUMO = nHOMO + 1;
+
+    double deltaE = prefactor * (nLUMO * nLUMO - nHOMO * nHOMO);
+    double wavelength = h * c / deltaE;
+    return { deltaE, wavelength };
+}
+
+void QuantumParticle::exportFreeElectronModelCSV(const std::string& filename, int numElectrons) {
+    const double hbar = 1.0545718e-34;
+    const double eV = 1.602176634e-19;
+    double L = length;
+    double prefactor = (hbar * hbar * M_PI * M_PI) / (2.0 * mass * L * L);
+
+    std::ofstream out(filename);
+    out << "n,energy_J,energy_eV,occupancy\n";
+
+    int filled = 0;
+    int nHOMO = (numElectrons + 1) / 2;
+    int maxN = nHOMO + 2;
+    for (int n = 1; n <= maxN; ++n) {
+        double En = prefactor * n * n;
+        int occ = 0;
+        if (filled < numElectrons) {
+            occ = (std::min)(2, numElectrons - filled);
+            filled += occ;
+        }
+        out << n << "," << En << "," << En / eV << "," << occ << "\n";
+    }
+    out.close();
+}
+
+// ===== Helium Atom =====
+
+double QuantumParticle::heliumUnperturbedEnergy() {
+    // E^(0) = -4 ke^2/a0 = -4 Hartree
+    const double ke2_over_a0 = 4.3597447222071e-18; // 1 Hartree in J
+    return -4.0 * ke2_over_a0;
+}
+
+double QuantumParticle::heliumFirstOrderCorrection() {
+    // E^(1) = (5/4) ke^2/a0
+    const double ke2_over_a0 = 4.3597447222071e-18;
+    return (5.0 / 4.0) * ke2_over_a0;
+}
+
+double QuantumParticle::heliumVariationalEnergy(double lambda) {
+    // E(lambda) = (lambda^2 - 27*lambda/8) ke^2/a0
+    const double ke2_over_a0 = 4.3597447222071e-18;
+    return (lambda * lambda - 27.0 * lambda / 8.0) * ke2_over_a0;
+}
+
+double QuantumParticle::heliumOptimalLambda() {
+    // dE/d(lambda) = 0 => 2*lambda - 27/8 = 0 => lambda = 27/16
+    return 27.0 / 16.0;
+}
+
+void QuantumParticle::exportHeliumVariationalCSV(const std::string& filename, int numPoints) {
+    const double eV = 1.602176634e-19;
+    std::ofstream out(filename);
+    out << "lambda,energy_J,energy_eV\n";
+
+    double lamMin = 1.0;
+    double lamMax = 2.5;
+    for (int i = 0; i <= numPoints; ++i) {
+        double lam = lamMin + (lamMax - lamMin) * i / numPoints;
+        double E = heliumVariationalEnergy(lam);
+        out << lam << "," << E << "," << E / eV << "\n";
+    }
+    out.close();
+}

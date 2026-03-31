@@ -45,6 +45,8 @@ int main() {
     std::cout << "25 - Addition of Angular Momentum\n";
     std::cout << "26 - Non-Degenerate Perturbation Theory\n";
     std::cout << "27 - Degenerate Perturbation Theory\n";
+    std::cout << "28 - Identical Particles & Exchange Symmetry\n";
+    std::cout << "29 - Helium Atom & Variational Method\n";
 
     int choice;
     std::cin >> choice;
@@ -1402,6 +1404,282 @@ int main() {
                 std::cout << "    |+> = (1/sqrt(2))(|1> + |2>)\n";
                 std::cout << "    |-> = (1/sqrt(2))(|1> - |2>)\n";
             }
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 28: Identical Particles & Exchange Symmetry =====
+    else if (choice == 28) {
+        std::cout << "\nIdentical Particles & Exchange Symmetry\n";
+        std::cout << "1 - Two-particle wavefunctions (symmetric/antisymmetric)\n";
+        std::cout << "2 - Slater determinant\n";
+        std::cout << "3 - Free-electron model (molecular electrons)\n";
+        std::cout << "Select: ";
+        int ip;
+        std::cin >> ip;
+
+        if (ip == 1) {
+            std::cout << "\n--- Exchange Symmetry ---\n";
+            std::cout << "P12 psi(1,2) = psi(2,1)\n";
+            std::cout << "Bosons:   P12 psi = +psi (symmetric)\n";
+            std::cout << "Fermions: P12 psi = -psi (antisymmetric)\n\n";
+
+            std::cout << "Two-particle ISW wavefunctions:\n";
+            std::cout << "psi_+(x1,x2) = (1/sqrt(2))[psi_a(x1)psi_b(x2) + psi_a(x2)psi_b(x1)]\n";
+            std::cout << "psi_-(x1,x2) = (1/sqrt(2))[psi_a(x1)psi_b(x2) - psi_a(x2)psi_b(x1)]\n\n";
+
+            int nA, nB;
+            std::cout << "Orbital quantum number nA: "; std::cin >> nA;
+            std::cout << "Orbital quantum number nB: "; std::cin >> nB;
+
+            if (nA == nB) {
+                std::cout << "\nNote: For nA = nB, the antisymmetric spatial wavefunction vanishes!\n";
+                std::cout << "This is the Pauli exclusion principle.\n";
+                std::cout << "Two identical fermions cannot occupy the same spatial orbital\n";
+                std::cout << "unless they have different spin states.\n";
+            }
+
+            double L = particle.length;
+            double x1 = L / 3.0;
+            double x2 = 2.0 * L / 3.0;
+            double psiS = particle.twoParticleISW(nA, nB, x1, x2, true);
+            double psiA = particle.twoParticleISW(nA, nB, x1, x2, false);
+
+            std::cout << "\n--- Sample values at x1=L/3, x2=2L/3 ---\n";
+            std::cout << "  psi_+(L/3, 2L/3) = " << psiS << "\n";
+            std::cout << "  psi_-(L/3, 2L/3) = " << psiA << "\n";
+            std::cout << "  |psi_+|^2 = " << psiS * psiS << "\n";
+            std::cout << "  |psi_-|^2 = " << psiA * psiA << "\n";
+
+            double psiS_swap = particle.twoParticleISW(nA, nB, x2, x1, true);
+            double psiA_swap = particle.twoParticleISW(nA, nB, x2, x1, false);
+            std::cout << "\n--- Exchange verification ---\n";
+            std::cout << "  psi_+(2L/3, L/3) = " << psiS_swap << " (should equal psi_+)\n";
+            std::cout << "  psi_-(2L/3, L/3) = " << psiA_swap << " (should equal -psi_-)\n";
+
+            std::cout << "\n--- For two electrons ---\n";
+            std::cout << "  Total Psi must be antisymmetric\n";
+            std::cout << "  Triplet spin (symmetric) x antisymmetric spatial (psi_-)\n";
+            std::cout << "  Singlet spin (antisymmetric) x symmetric spatial (psi_+)\n";
+
+            particle.exportTwoParticleISWCSV("two_particle_isw.csv", nA, nB, 50);
+            std::cout << "\nTwo-particle wavefunction saved to two_particle_isw.csv\n";
+        }
+        else if (ip == 2) {
+            std::cout << "\n--- Slater Determinant ---\n";
+            std::cout << "For N fermions in 1D ISW orbitals:\n";
+            std::cout << "Psi(x1,...,xN) = (1/sqrt(N!)) det[psi_ni(xj)]\n\n";
+
+            int N;
+            std::cout << "Number of particles N: "; std::cin >> N;
+
+            std::vector<int> orbitals(N);
+            std::cout << "Enter " << N << " orbital quantum numbers:\n";
+            for (int i = 0; i < N; ++i) {
+                std::cout << "  n_" << (i + 1) << ": ";
+                std::cin >> orbitals[i];
+            }
+
+            bool hasDuplicates = false;
+            for (int i = 0; i < N && !hasDuplicates; ++i) {
+                for (int j = i + 1; j < N; ++j) {
+                    if (orbitals[i] == orbitals[j]) {
+                        hasDuplicates = true;
+                        break;
+                    }
+                }
+            }
+            if (hasDuplicates) {
+                std::cout << "\nWARNING: Duplicate orbitals detected!\n";
+                std::cout << "The Slater determinant will be zero (Pauli exclusion).\n";
+            }
+
+            std::vector<double> positions(N);
+            std::cout << "Enter " << N << " positions (as fraction of L):\n";
+            double L = particle.length;
+            for (int i = 0; i < N; ++i) {
+                double frac;
+                std::cout << "  x_" << (i + 1) << "/L: ";
+                std::cin >> frac;
+                positions[i] = frac * L;
+            }
+
+            double psi = particle.slaterDeterminantISW(orbitals, positions);
+            std::cout << "\n  Psi = " << psi << "\n";
+            std::cout << "  |Psi|^2 = " << psi * psi << "\n";
+
+            if (N >= 2) {
+                std::swap(positions[0], positions[1]);
+                double psi_swap = particle.slaterDeterminantISW(orbitals, positions);
+                std::cout << "\n  After swapping particles 1 and 2:\n";
+                std::cout << "  Psi = " << psi_swap << " (should be " << -psi << ")\n";
+            }
+        }
+        else if (ip == 3) {
+            std::cout << "\n--- Free-Electron Model ---\n";
+            std::cout << "N electrons in a 1D box (each orbital holds 2 electrons)\n\n";
+
+            int numE;
+            double boxL;
+            std::cout << "Number of electrons: "; std::cin >> numE;
+            std::cout << "Box length L (m) [0 = butadiene 0.56 nm]: "; std::cin >> boxL;
+            if (boxL == 0.0) boxL = 0.56e-9;
+
+            double origL = particle.length;
+            particle.length = boxL;
+
+            const double hbar = 1.0545718e-34;
+            const double h = 6.62607015e-34;
+            const double c = 2.99792458e8;
+            const double eV = 1.602176634e-19;
+
+            double Egs = particle.freeElectronGroundStateEnergy(numE);
+            std::cout << "  Box length L = " << boxL * 1e9 << " nm\n";
+            std::cout << "  Number of electrons = " << numE << "\n";
+            std::cout << "  Ground state energy = " << Egs << " J = " << Egs / eV << " eV\n\n";
+
+            std::cout << "  Level filling (spin degeneracy = 2):\n";
+            double prefactor = (hbar * hbar * M_PI * M_PI) / (2.0 * particle.mass * boxL * boxL);
+            int filled = 0;
+            int nHOMO = (numE + 1) / 2;
+            int maxShow = nHOMO + 2;
+            for (int n = 1; n <= maxShow; ++n) {
+                double En = prefactor * n * n;
+                int occ = 0;
+                if (filled < numE) {
+                    occ = (std::min)(2, numE - filled);
+                    filled += occ;
+                }
+                std::cout << "    n=" << n << "  E = " << En / eV << " eV  occupancy = " << occ;
+                if (n == nHOMO) std::cout << "  <-- HOMO";
+                if (n == nHOMO + 1) std::cout << "  <-- LUMO";
+                std::cout << "\n";
+            }
+
+            auto [deltaE, wavelength] = particle.freeElectronTransition(numE);
+            std::cout << "\n  HOMO -> LUMO transition:\n";
+            std::cout << "    n = " << nHOMO << " -> " << (nHOMO + 1) << "\n";
+            std::cout << "    Delta E = " << deltaE / eV << " eV\n";
+            std::cout << "    Wavelength = " << wavelength * 1e9 << " nm\n";
+
+            if (fabs(boxL - 0.56e-9) < 1e-12 && numE == 4) {
+                std::cout << "\n  Butadiene comparison:\n";
+                std::cout << "    Predicted lambda_max ~ " << wavelength * 1e9 << " nm\n";
+                std::cout << "    Experimental lambda_max ~ 210 nm\n";
+            }
+
+            particle.exportFreeElectronModelCSV("free_electron_model.csv", numE);
+            std::cout << "\nLevel filling saved to free_electron_model.csv\n";
+
+            particle.length = origL;
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 29: Helium Atom & Variational Method =====
+    else if (choice == 29) {
+        std::cout << "\nHelium Atom & Variational Method\n";
+        std::cout << "1 - Helium ground state (perturbation theory)\n";
+        std::cout << "2 - Parahelium and orthohelium\n";
+        std::cout << "3 - Variational method\n";
+        std::cout << "Select: ";
+        int he;
+        std::cin >> he;
+
+        const double eV = 1.602176634e-19;
+
+        if (he == 1) {
+            std::cout << "\n--- Helium Ground State (Perturbation Theory) ---\n";
+            std::cout << "H = H0 + H1\n";
+            std::cout << "H0 = h(1) + h(2),  h(i) = p_i^2/(2m) - 2ke^2/r_i\n";
+            std::cout << "H1 = ke^2/|r1 - r2|  (electron-electron repulsion)\n\n";
+
+            double E0 = QuantumParticle::heliumUnperturbedEnergy();
+            double E1 = QuantumParticle::heliumFirstOrderCorrection();
+            double Etotal = E0 + E1;
+
+            std::cout << "--- Zeroth order ---\n";
+            std::cout << "  Both electrons in 1s orbital (Z=2)\n";
+            std::cout << "  E^(0) = -4 ke^2/a0 = " << E0 / eV << " eV\n\n";
+
+            std::cout << "--- First-order correction ---\n";
+            std::cout << "  E^(1) = <Psi^(0)|H1|Psi^(0)> = (5/4) ke^2/a0\n";
+            std::cout << "  E^(1) = " << E1 / eV << " eV\n\n";
+
+            std::cout << "--- Corrected energy ---\n";
+            std::cout << "  E = E^(0) + E^(1) = " << Etotal / eV << " eV\n";
+            std::cout << "  Experimental: -79.0 eV\n";
+            std::cout << "  Error: " << fabs((Etotal / eV + 79.0) / 79.0) * 100.0 << " %\n";
+        }
+        else if (he == 2) {
+            std::cout << "\n--- Parahelium and Orthohelium ---\n";
+            std::cout << "First excited states: one electron in 1s, one in nlm\n\n";
+
+            std::cout << "Total wavefunction = spatial x spin (must be antisymmetric)\n\n";
+
+            std::cout << "PARAHELIUM (singlet spin, S=0):\n";
+            std::cout << "  Spin: antisymmetric (singlet)\n";
+            std::cout << "  Spatial: symmetric\n";
+            std::cout << "  Psi_para = (1/sqrt(2))[psi_1s(r1)*psi_nlm(r2) + psi_nlm(r1)*psi_1s(r2)]\n";
+            std::cout << "  E_para^(1) = J + K\n\n";
+
+            std::cout << "ORTHOHELIUM (triplet spin, S=1):\n";
+            std::cout << "  Spin: symmetric (triplet)\n";
+            std::cout << "  Spatial: antisymmetric\n";
+            std::cout << "  Psi_ortho = (1/sqrt(2))[psi_1s(r1)*psi_nlm(r2) - psi_nlm(r1)*psi_1s(r2)]\n";
+            std::cout << "  E_ortho^(1) = J - K\n\n";
+
+            std::cout << "where:\n";
+            std::cout << "  J = direct (Coulomb) integral > 0\n";
+            std::cout << "  K = exchange integral > 0\n\n";
+
+            std::cout << "Since K > 0:\n";
+            std::cout << "  E_ortho < E_para  (orthohelium lies lower)\n";
+            std::cout << "  The exchange interaction splits the degeneracy\n\n";
+
+            std::cout << "--- Ground state ---\n";
+            std::cout << "  Both electrons in 1s: only singlet (parahelium) allowed\n";
+            std::cout << "  (antisymmetric spatial with same orbital = 0)\n";
+        }
+        else if (he == 3) {
+            std::cout << "\n--- Variational Method for Helium ---\n";
+            std::cout << "Trial wavefunction: psi = (lambda^3/(pi*a0^3)) exp(-lambda(r1+r2)/a0)\n";
+            std::cout << "lambda is an effective nuclear charge (variational parameter)\n\n";
+
+            std::cout << "Energy functional:\n";
+            std::cout << "  E(lambda) = (lambda^2 - 27*lambda/8) ke^2/a0\n\n";
+
+            double lamOpt = QuantumParticle::heliumOptimalLambda();
+            double Eopt = QuantumParticle::heliumVariationalEnergy(lamOpt);
+            double E0 = QuantumParticle::heliumUnperturbedEnergy();
+            double Epert = E0 + QuantumParticle::heliumFirstOrderCorrection();
+
+            std::cout << "  dE/d(lambda) = 0  =>  lambda_min = 27/16 = " << lamOpt << "\n";
+            std::cout << "  E(lambda_min) = " << Eopt / eV << " eV\n\n";
+
+            std::cout << "--- Comparison ---\n";
+            std::cout << "  Unperturbed (Z=2):     " << E0 / eV << " eV\n";
+            std::cout << "  First-order pert:      " << Epert / eV << " eV\n";
+            std::cout << "  Variational (lambda*): " << Eopt / eV << " eV\n";
+            std::cout << "  Experimental:          -79.0 eV\n\n";
+
+            std::cout << "  Variational error: " << fabs((Eopt / eV + 79.0) / 79.0) * 100.0 << " %\n";
+            std::cout << "  Physical interpretation: lambda < 2 means each electron\n";
+            std::cout << "  partially screens the nucleus from the other electron.\n";
+
+            std::cout << "\n--- E(lambda) scan ---\n";
+            for (double lam = 1.0; lam <= 2.51; lam += 0.25) {
+                double E = QuantumParticle::heliumVariationalEnergy(lam);
+                std::cout << "  lambda = " << lam << "  E = " << E / eV << " eV\n";
+            }
+            std::cout << "  lambda = " << lamOpt << "  E = " << Eopt / eV << " eV  <-- minimum\n";
+
+            particle.exportHeliumVariationalCSV("helium_variational.csv", 200);
+            std::cout << "\nVariational energy E(lambda) saved to helium_variational.csv\n";
         }
         else {
             std::cout << "Invalid selection.\n";

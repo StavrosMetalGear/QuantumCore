@@ -188,6 +188,23 @@ public:
     static std::pair<double, double> diagonalize2x2(double H11, double H22, std::complex<double> H12);
     void exportDegenerateTwoLevelCSV(const std::string& filename, double E0, double OmegaMax, int numPoints);
 
+    // ===== Identical Particles & Exchange Symmetry =====
+    double twoParticleISW(int nA, int nB, double x1, double x2, bool symmetric);
+    void exportTwoParticleISWCSV(const std::string& filename, int nA, int nB, int numPoints);
+    static double determinantNxN(const std::vector<std::vector<double>>& matrix, int n);
+    double slaterDeterminantISW(const std::vector<int>& orbitals,
+                                const std::vector<double>& positions);
+    double freeElectronGroundStateEnergy(int numElectrons);
+    std::pair<double, double> freeElectronTransition(int numElectrons);
+    void exportFreeElectronModelCSV(const std::string& filename, int numElectrons);
+
+    // ===== Helium Atom =====
+    static double heliumUnperturbedEnergy();
+    static double heliumFirstOrderCorrection();
+    static double heliumVariationalEnergy(double lambda);
+    static double heliumOptimalLambda();
+    void exportHeliumVariationalCSV(const std::string& filename, int numPoints);
+
 };
 
 
