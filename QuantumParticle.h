@@ -5,6 +5,10 @@
 #include <complex>
 #include <utility>
 #include <tuple>
+#include <array>
+
+using SpinMatrix = std::array<std::array<std::complex<double>, 2>, 2>;
+using Spinor = std::array<std::complex<double>, 2>;
 
 class QuantumParticle {
 public:
@@ -139,6 +143,34 @@ public:
     static double computeReducedMass(double m1, double m2);
     double computeTwoBodyCoulombEnergy(double m1, double m2, int n, double Z);
     void exportTwoBodyComparisonCSV(const std::string& filename, double m1, double m2, double Z, int maxN);
+
+    // ===== Orbital Angular Momentum =====
+    static double ladderCoefficient(int l, int m, bool raising);
+    void exportOrbitalAngularMomentumCSV(const std::string& filename, int lMax);
+    void exportLadderOperatorActionCSV(const std::string& filename, int l);
+
+    // ===== Spin-1/2 =====
+    static SpinMatrix pauliX();
+    static SpinMatrix pauliY();
+    static SpinMatrix pauliZ();
+    static SpinMatrix spinOperator(char component);
+    static SpinMatrix spinRaising();
+    static SpinMatrix spinLowering();
+    static Spinor eigenstateSpin(char axis, bool plus);
+    static std::tuple<double, double, double> computeSpinExpectation(
+        std::complex<double> alpha, std::complex<double> beta);
+    static SpinMatrix multiplySpinMatrices(const SpinMatrix& A, const SpinMatrix& B);
+    void exportPauliMatricesCSV(const std::string& filename);
+    void exportSpinAnalysisCSV(const std::string& filename,
+        std::complex<double> alpha, std::complex<double> beta);
+
+    // ===== Addition of Angular Momentum =====
+    static std::vector<double> listAllowedJ(double j1, double j2);
+    static double factorial(int n);
+    static double clebschGordan(double j1, double m1, double j2, double m2,
+                                double J, double M);
+    void exportCoupledStatesCSV(const std::string& filename, double j1, double j2);
+    void exportSingletTripletCSV(const std::string& filename);
 
 };
 

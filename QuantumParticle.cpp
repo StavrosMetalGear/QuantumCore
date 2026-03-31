@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <tuple>
 #include <iostream>
+#include <array>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
@@ -1301,7 +1302,308 @@ void QuantumParticle::exportTwoBodyComparisonCSV(
     out.close();
 }
 
+// ============================================================
+// Orbital Angular Momentum
+// ============================================================
 
+// L+ Y_l^m = hbar * sqrt(l(l+1) - m(m+1)) * Y_l^{m+1}   (raising = true)
+// L- Y_l^m = hbar * sqrt(l(l+1) - m(m-1)) * Y_l^{m-1}   (raising = false)
+double QuantumParticle::ladderCoefficient(int l, int m, bool raising) {
+    if (raising) {
+        double arg = (double)l * (l + 1) - (double)m * (m + 1);
+        return (arg > 0.0) ? sqrt(arg) : 0.0;
+    } else {
+        double arg = (double)l * (l + 1) - (double)m * (m - 1);
+        return (arg > 0.0) ? sqrt(arg) : 0.0;
+    }
+}
 
+// Export eigenvalues of L^2 and L_z for all l up to lMax
+void QuantumParticle::exportOrbitalAngularMomentumCSV(
+    const std::string& filename, int lMax)
+{
+    std::ofstream out(filename);
+    out << "l,m,L2_over_hbar2,Lz_over_hbar,degeneracy\n";
+    for (int l = 0; l <= lMax; ++l) {
+        for (int m = -l; m <= l; ++m) {
+            out << l << "," << m << "," << l * (l + 1) << "," << m
+                << "," << (2 * l + 1) << "\n";
+        }
+    }
+    out.close();
+}
 
+// Export the action of L+, L- on all |l,m> states
+void QuantumParticle::exportLadderOperatorActionCSV(
+    const std::string& filename, int l)
+{
+    std::ofstream out(filename);
+    out << "l,m,Lplus_coeff,Lplus_target_m,Lminus_coeff,Lminus_target_m\n";
+    for (int m = -l; m <= l; ++m) {
+        double cp = ladderCoefficient(l, m, true);
+        double cm = ladderCoefficient(l, m, false);
+        int mp = (m + 1 <= l) ? (m + 1) : m;
+        int mm = (m - 1 >= -l) ? (m - 1) : m;
+        out << l << "," << m << "," << cp << "," << mp << ","
+            << cm << "," << mm << "\n";
+    }
+    out.close();
+}
 
+// ============================================================
+// Spin-1/2 System
+// ============================================================
+
+SpinMatrix QuantumParticle::pauliX() {
+    return {{ {{{0, 0}, {1, 0}}}, {{{1, 0}, {0, 0}}} }};
+}
+
+SpinMatrix QuantumParticle::pauliY() {
+    return {{ {{{0, 0}, {0, -1}}}, {{{0, 1}, {0, 0}}} }};
+}
+
+SpinMatrix QuantumParticle::pauliZ() {
+    return {{ {{{1, 0}, {0, 0}}}, {{{0, 0}, {-1, 0}}} }};
+}
+
+// S_i = (hbar/2) * sigma_i
+SpinMatrix QuantumParticle::spinOperator(char component) {
+    const double hbar = 1.0545718e-34;
+    double h2 = hbar / 2.0;
+    SpinMatrix sigma;
+    switch (component) {
+        case 'x': sigma = pauliX(); break;
+        case 'y': sigma = pauliY(); break;
+        case 'z': sigma = pauliZ(); break;
+        default: return {{ {{{0, 0}, {0, 0}}}, {{{0, 0}, {0, 0}}} }};
+    }
+    SpinMatrix S;
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            S[i][j] = h2 * sigma[i][j];
+    return S;
+}
+
+// S+ = hbar * [[0,1],[0,0]]
+SpinMatrix QuantumParticle::spinRaising() {
+    const double hbar = 1.0545718e-34;
+    return {{ {{{0, 0}, {hbar, 0}}}, {{{0, 0}, {0, 0}}} }};
+}
+
+// S- = hbar * [[0,0],[1,0]]
+SpinMatrix QuantumParticle::spinLowering() {
+    const double hbar = 1.0545718e-34;
+    return {{ {{{0, 0}, {0, 0}}}, {{{hbar, 0}, {0, 0}}} }};
+}
+
+// Eigenstates of Sx, Sy, Sz
+Spinor QuantumParticle::eigenstateSpin(char axis, bool plus) {
+    const double inv_sqrt2 = 1.0 / sqrt(2.0);
+    switch (axis) {
+        case 'z':
+            if (plus) return {{{1, 0}, {0, 0}}};
+            else      return {{{0, 0}, {1, 0}}};
+        case 'x':
+            if (plus) return {{{inv_sqrt2, 0}, {inv_sqrt2, 0}}};
+            else      return {{{inv_sqrt2, 0}, {-inv_sqrt2, 0}}};
+        case 'y':
+            if (plus) return {{std::complex<double>(inv_sqrt2, 0),
+                               std::complex<double>(0, inv_sqrt2)}};
+            else      return {{std::complex<double>(inv_sqrt2, 0),
+                               std::complex<double>(0, -inv_sqrt2)}};
+        default:
+            return {{{1, 0}, {0, 0}}};
+    }
+}
+
+// <Sx>, <Sy>, <Sz> for spinor |psi> = alpha|up> + beta|down>
+std::tuple<double, double, double> QuantumParticle::computeSpinExpectation(
+    std::complex<double> alpha, std::complex<double> beta)
+{
+    const double hbar = 1.0545718e-34;
+    double h2 = hbar / 2.0;
+    // <Sx> = (hbar/2)(alpha* beta + beta* alpha)
+    double Sx = h2 * (std::conj(alpha) * beta + std::conj(beta) * alpha).real();
+    // <Sy> = (hbar/2)(-i alpha* beta + i beta* alpha)
+    double Sy = h2 * (std::complex<double>(0, -1) * std::conj(alpha) * beta +
+                       std::complex<double>(0, 1) * std::conj(beta) * alpha).real();
+    // <Sz> = (hbar/2)(|alpha|^2 - |beta|^2)
+    double Sz = h2 * (std::norm(alpha) - std::norm(beta));
+    return {Sx, Sy, Sz};
+}
+
+// Matrix multiplication for 2x2 spin matrices
+SpinMatrix QuantumParticle::multiplySpinMatrices(const SpinMatrix& A, const SpinMatrix& B) {
+    SpinMatrix C = {{ {{{0, 0}, {0, 0}}}, {{{0, 0}, {0, 0}}} }};
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            for (int k = 0; k < 2; ++k)
+                C[i][j] += A[i][k] * B[k][j];
+    return C;
+}
+
+void QuantumParticle::exportPauliMatricesCSV(const std::string& filename) {
+    std::ofstream out(filename);
+    out << "matrix,row,col,Re,Im\n";
+    auto write = [&](const std::string& name, const SpinMatrix& M) {
+        for (int i = 0; i < 2; ++i)
+            for (int j = 0; j < 2; ++j)
+                out << name << "," << i << "," << j << ","
+                    << M[i][j].real() << "," << M[i][j].imag() << "\n";
+    };
+    write("sigma_x", pauliX());
+    write("sigma_y", pauliY());
+    write("sigma_z", pauliZ());
+    write("S_plus", spinRaising());
+    write("S_minus", spinLowering());
+    out.close();
+}
+
+void QuantumParticle::exportSpinAnalysisCSV(
+    const std::string& filename,
+    std::complex<double> alpha, std::complex<double> beta)
+{
+    std::ofstream out(filename);
+    out << "quantity,value\n";
+    double norm2 = std::norm(alpha) + std::norm(beta);
+    out << "P_up," << std::norm(alpha) / norm2 << "\n";
+    out << "P_down," << std::norm(beta) / norm2 << "\n";
+
+    auto [Sx, Sy, Sz] = computeSpinExpectation(alpha, beta);
+    out << "Sx," << Sx << "\n";
+    out << "Sy," << Sy << "\n";
+    out << "Sz," << Sz << "\n";
+    out.close();
+}
+
+// ============================================================
+// Addition of Angular Momentum
+// ============================================================
+
+double QuantumParticle::factorial(int n) {
+    if (n <= 1) return 1.0;
+    double result = 1.0;
+    for (int i = 2; i <= n; ++i)
+        result *= i;
+    return result;
+}
+
+std::vector<double> QuantumParticle::listAllowedJ(double j1, double j2) {
+    std::vector<double> jValues;
+    double jMin = fabs(j1 - j2);
+    double jMax = j1 + j2;
+    for (double j = jMin; j <= jMax + 0.01; j += 1.0) {
+        jValues.push_back(j);
+    }
+    return jValues;
+}
+
+// Clebsch-Gordan coefficient <j1,m1;j2,m2|J,M> using Racah formula
+double QuantumParticle::clebschGordan(
+    double j1, double m1, double j2, double m2, double J, double M)
+{
+    // Selection rules
+    if (fabs(m1 + m2 - M) > 1e-10) return 0.0;
+    if (J < fabs(j1 - j2) - 1e-10 || J > j1 + j2 + 1e-10) return 0.0;
+    if (fabs(m1) > j1 + 1e-10 || fabs(m2) > j2 + 1e-10 || fabs(M) > J + 1e-10) return 0.0;
+
+    // Convert to integer indices (all these are integers or half-integers
+    // but the differences/sums used in factorials are always integers)
+    auto toInt = [](double x) -> int { return (int)round(x); };
+
+    int a1 = toInt(j1 + j2 - J);
+    int a2 = toInt(J + j1 - j2);
+    int a3 = toInt(J - j1 + j2);
+    int a4 = toInt(j1 + j2 + J + 1);
+    int b1 = toInt(j1 + m1);
+    int b2 = toInt(j1 - m1);
+    int b3 = toInt(j2 + m2);
+    int b4 = toInt(j2 - m2);
+    int b5 = toInt(J + M);
+    int b6 = toInt(J - M);
+
+    if (a1 < 0 || a2 < 0 || a3 < 0 || b1 < 0 || b2 < 0 ||
+        b3 < 0 || b4 < 0 || b5 < 0 || b6 < 0) return 0.0;
+
+    double delta = sqrt(factorial(a1) * factorial(a2) * factorial(a3) / factorial(a4));
+    double prefactor = sqrt(2.0 * J + 1.0) * delta *
+                       sqrt(factorial(b1) * factorial(b2) * factorial(b3) *
+                            factorial(b4) * factorial(b5) * factorial(b6));
+
+    // Sum over s
+    double sum = 0.0;
+    int sMin = 0;
+    int sMax = toInt(j1 + j2 - J);
+    // Also bounded by j1-m1-s >= 0, j2+m2-s >= 0, J-j2+m1+s >= 0, J-j1-m2+s >= 0
+    for (int s = 0; s <= 100; ++s) {
+        int f1 = s;
+        int f2 = toInt(j1 + j2 - J) - s;
+        int f3 = toInt(j1 - m1) - s;
+        int f4 = toInt(j2 + m2) - s;
+        int f5 = toInt(J - j2 + m1) + s;
+        int f6 = toInt(J - j1 - m2) + s;
+
+        if (f1 < 0 || f2 < 0 || f3 < 0 || f4 < 0 || f5 < 0 || f6 < 0)
+            continue;
+
+        double denom = factorial(f1) * factorial(f2) * factorial(f3) *
+                       factorial(f4) * factorial(f5) * factorial(f6);
+        double sign = (s % 2 == 0) ? 1.0 : -1.0;
+        sum += sign / denom;
+
+        // Once we've passed the valid range, no more terms
+        if (f2 < 0 || f3 < 0 || f4 < 0) break;
+    }
+
+    return prefactor * sum;
+}
+
+// Export all CG coefficients for given j1, j2
+void QuantumParticle::exportCoupledStatesCSV(
+    const std::string& filename, double j1, double j2)
+{
+    std::ofstream out(filename);
+    out << "j1,m1,j2,m2,J,M,CG\n";
+
+    auto jValues = listAllowedJ(j1, j2);
+
+    for (double J : jValues) {
+        for (double M = -J; M <= J + 0.01; M += 1.0) {
+            for (double m1 = -j1; m1 <= j1 + 0.01; m1 += 1.0) {
+                double m2 = M - m1;
+                if (fabs(m2) > j2 + 0.01) continue;
+                // Check m2 is a valid quantum number
+                bool validM2 = false;
+                for (double tm = -j2; tm <= j2 + 0.01; tm += 1.0) {
+                    if (fabs(tm - m2) < 0.01) { validM2 = true; break; }
+                }
+                if (!validM2) continue;
+
+                double cg = clebschGordan(j1, m1, j2, m2, J, M);
+                if (fabs(cg) > 1e-12) {
+                    out << j1 << "," << m1 << "," << j2 << "," << m2
+                        << "," << J << "," << M << "," << cg << "\n";
+                }
+            }
+        }
+    }
+    out.close();
+}
+
+// Export the singlet and triplet states for two spin-1/2 particles
+void QuantumParticle::exportSingletTripletCSV(const std::string& filename) {
+    std::ofstream out(filename);
+    out << "state_name,S,M_S,c_upup,c_updown,c_downup,c_downdown\n";
+    double inv_sqrt2 = 1.0 / sqrt(2.0);
+
+    // |1,1> = |up,up>
+    out << "triplet_+1,1,1,1,0,0,0\n";
+    // |1,0> = (|up,down> + |down,up>) / sqrt(2)
+    out << "triplet_0,1,0,0," << inv_sqrt2 << "," << inv_sqrt2 << ",0\n";
+    // |1,-1> = |down,down>
+    out << "triplet_-1,1,-1,0,0,0,1\n";
+    // |0,0> = (|up,down> - |down,up>) / sqrt(2)
+    out << "singlet,0,0,0," << inv_sqrt2 << "," << -inv_sqrt2 << ",0\n";
+
+    out.close();
+}

@@ -40,6 +40,9 @@ int main() {
     std::cout << "20 - Central Potential & Spherical Harmonics\n";
     std::cout << "21 - Spherical Infinite Well\n";
     std::cout << "22 - Two-Body Problem\n";
+    std::cout << "23 - Orbital Angular Momentum\n";
+    std::cout << "24 - Spin-1/2 System\n";
+    std::cout << "25 - Addition of Angular Momentum\n";
 
     int choice;
     std::cin >> choice;
@@ -863,6 +866,321 @@ int main() {
 
         particle.exportTwoBodyComparisonCSV("two_body_comparison.csv", m1, m2, Z, maxN);
         std::cout << "Comparison saved to two_body_comparison.csv\n";
+    }
+
+    // ===== 23: Orbital Angular Momentum =====
+    else if (choice == 23) {
+        std::cout << "\nOrbital Angular Momentum\n";
+        std::cout << "1 - Eigenvalues & ladder operators for given l\n";
+        std::cout << "2 - Commutation relations\n";
+        std::cout << "3 - L operators in spherical coordinates\n";
+        std::cout << "Select: ";
+        int am;
+        std::cin >> am;
+
+        const double hbar = 1.0545718e-34;
+
+        if (am == 1) {
+            int l;
+            std::cout << "Enter l: "; std::cin >> l;
+
+            std::cout << "\n--- Eigenvalues for l = " << l << " ---\n";
+            std::cout << "  L^2 = hbar^2 * l(l+1) = hbar^2 * " << l * (l + 1) << "\n";
+            std::cout << "  |L| = hbar * sqrt(l(l+1)) = " << hbar * sqrt((double)l * (l + 1)) << " J*s\n";
+            std::cout << "  m = " << -l << " to " << l << " (" << (2 * l + 1) << " states)\n\n";
+
+            std::cout << "--- Ladder operator action ---\n";
+            std::cout << "  L+ Y_l^m = hbar * sqrt(l(l+1)-m(m+1)) * Y_l^{m+1}\n";
+            std::cout << "  L- Y_l^m = hbar * sqrt(l(l+1)-m(m-1)) * Y_l^{m-1}\n\n";
+
+            for (int m = -l; m <= l; ++m) {
+                double cp = QuantumParticle::ladderCoefficient(l, m, true);
+                double cm = QuantumParticle::ladderCoefficient(l, m, false);
+                std::cout << "  |" << l << "," << m << ">:";
+                if (m < l)
+                    std::cout << "  L+: hbar*" << cp << " -> |" << l << "," << m + 1 << ">";
+                else
+                    std::cout << "  L+: 0 (max m)";
+                if (m > -l)
+                    std::cout << "  L-: hbar*" << cm << " -> |" << l << "," << m - 1 << ">";
+                else
+                    std::cout << "  L-: 0 (min m)";
+                std::cout << "\n";
+            }
+
+            std::cout << "\n--- Lx, Ly in terms of L+, L- ---\n";
+            std::cout << "  Lx = (L+ + L-) / 2\n";
+            std::cout << "  Ly = (L+ - L-) / (2i)\n";
+
+            particle.exportOrbitalAngularMomentumCSV("orbital_am_eigenvalues.csv", l);
+            particle.exportLadderOperatorActionCSV("orbital_am_ladder.csv", l);
+            std::cout << "\nEigenvalues saved to orbital_am_eigenvalues.csv\n";
+            std::cout << "Ladder action saved to orbital_am_ladder.csv\n";
+        }
+        else if (am == 2) {
+            std::cout << "\n--- Angular Momentum Commutation Relations ---\n";
+            std::cout << "  [Li, Lj] = i*hbar * epsilon_ijk * Lk\n\n";
+            std::cout << "  [Lx, Ly] = i*hbar*Lz\n";
+            std::cout << "  [Ly, Lz] = i*hbar*Lx\n";
+            std::cout << "  [Lz, Lx] = i*hbar*Ly\n\n";
+            std::cout << "  [Li, L^2] = 0  (all components commute with L^2)\n\n";
+            std::cout << "  [L+, L-] = 2*hbar*Lz\n";
+            std::cout << "  [Lz, L+] = hbar*L+\n";
+            std::cout << "  [Lz, L-] = -hbar*L-\n";
+        }
+        else if (am == 3) {
+            std::cout << "\n--- L Operators in Spherical Coordinates ---\n";
+            std::cout << "  Lz = -i*hbar * d/dphi\n\n";
+            std::cout << "  Lx = i*hbar * (sin(phi)*d/dtheta + cos(phi)/tan(theta)*d/dphi)\n";
+            std::cout << "  Ly = i*hbar * (-cos(phi)*d/dtheta + sin(phi)/tan(theta)*d/dphi)\n\n";
+            std::cout << "  L^2 = -hbar^2 * [1/sin(theta) * d/dtheta(sin(theta)*d/dtheta)\n";
+            std::cout << "                   + 1/sin^2(theta) * d^2/dphi^2]\n\n";
+            std::cout << "  L+ = hbar * e^{i*phi} * (d/dtheta + i/tan(theta)*d/dphi)\n";
+            std::cout << "  L- = hbar * e^{-i*phi} * (-d/dtheta + i/tan(theta)*d/dphi)\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 24: Spin-1/2 System =====
+    else if (choice == 24) {
+        std::cout << "\nSpin-1/2 System\n";
+        std::cout << "1 - Pauli matrices & spin operators\n";
+        std::cout << "2 - Spinor analysis (expectation values)\n";
+        std::cout << "3 - Eigenstates of Sx, Sy, Sz\n";
+        std::cout << "4 - Spin ladder operators\n";
+        std::cout << "Select: ";
+        int sp;
+        std::cin >> sp;
+
+        const double hbar = 1.0545718e-34;
+
+        if (sp == 1) {
+            std::cout << "\n--- Pauli Matrices ---\n";
+            std::cout << "  S = (hbar/2) * sigma\n\n";
+
+            auto printMatrix = [](const char* name, const SpinMatrix& M) {
+                std::cout << "  " << name << " = [\n";
+                for (int i = 0; i < 2; ++i) {
+                    std::cout << "    ";
+                    for (int j = 0; j < 2; ++j) {
+                        std::cout << "(" << M[i][j].real();
+                        if (M[i][j].imag() >= 0) std::cout << "+";
+                        std::cout << M[i][j].imag() << "i)";
+                        if (j == 0) std::cout << "  ";
+                    }
+                    std::cout << "\n";
+                }
+                std::cout << "  ]\n\n";
+            };
+
+            printMatrix("sigma_x", QuantumParticle::pauliX());
+            printMatrix("sigma_y", QuantumParticle::pauliY());
+            printMatrix("sigma_z", QuantumParticle::pauliZ());
+
+            std::cout << "--- Properties ---\n";
+            std::cout << "  sigma_j^2 = I  (for j = x, y, z)\n";
+            std::cout << "  [Si, Sj] = i*hbar * epsilon_ijk * Sk\n";
+            std::cout << "  [Si, S^2] = 0\n";
+            std::cout << "  S^2 = (3/4) hbar^2 I\n";
+
+            particle.exportPauliMatricesCSV("pauli_matrices.csv");
+            std::cout << "\nMatrices saved to pauli_matrices.csv\n";
+        }
+        else if (sp == 2) {
+            std::cout << "\n--- Spinor Analysis ---\n";
+            std::cout << "|psi> = alpha|up> + beta|down>\n";
+            double ar, ai, br, bi;
+            std::cout << "alpha (real part): "; std::cin >> ar;
+            std::cout << "alpha (imag part): "; std::cin >> ai;
+            std::cout << "beta  (real part): "; std::cin >> br;
+            std::cout << "beta  (imag part): "; std::cin >> bi;
+
+            std::complex<double> alpha(ar, ai);
+            std::complex<double> beta(br, bi);
+
+            double norm2 = std::norm(alpha) + std::norm(beta);
+            std::cout << "\n  |alpha|^2 + |beta|^2 = " << norm2;
+            if (fabs(norm2 - 1.0) > 1e-6) {
+                double nf = sqrt(norm2);
+                alpha /= nf;
+                beta /= nf;
+                std::cout << " (normalized)";
+            }
+            std::cout << "\n";
+
+            std::cout << "\n  P(+hbar/2 along z) = |alpha|^2 = " << std::norm(alpha) << "\n";
+            std::cout << "  P(-hbar/2 along z) = |beta|^2  = " << std::norm(beta) << "\n";
+
+            auto [Sx, Sy, Sz] = QuantumParticle::computeSpinExpectation(alpha, beta);
+            std::cout << "\n  <Sx> = " << Sx << " J*s\n";
+            std::cout << "  <Sy> = " << Sy << " J*s\n";
+            std::cout << "  <Sz> = " << Sz << " J*s\n";
+            std::cout << "  <Sz>/(hbar/2) = " << Sz / (hbar / 2.0) << "\n";
+
+            particle.exportSpinAnalysisCSV("spin_analysis.csv", alpha, beta);
+            std::cout << "\nSpin analysis saved to spin_analysis.csv\n";
+        }
+        else if (sp == 3) {
+            std::cout << "\n--- Eigenstates of Sx, Sy, Sz ---\n";
+
+            auto printSpinor = [](const char* name, const Spinor& s) {
+                std::cout << "  " << name << " = (";
+                std::cout << s[0].real();
+                if (s[0].imag() != 0) std::cout << "+" << s[0].imag() << "i";
+                std::cout << ", ";
+                std::cout << s[1].real();
+                if (s[1].imag() != 0) std::cout << "+" << s[1].imag() << "i";
+                std::cout << ")^T\n";
+            };
+
+            std::cout << "\nSz eigenstates (eigenvalues +/-hbar/2):\n";
+            printSpinor("|z+> = |up>  ", QuantumParticle::eigenstateSpin('z', true));
+            printSpinor("|z-> = |down>", QuantumParticle::eigenstateSpin('z', false));
+
+            std::cout << "\nSx eigenstates (eigenvalues +/-hbar/2):\n";
+            printSpinor("|x+>", QuantumParticle::eigenstateSpin('x', true));
+            printSpinor("|x->", QuantumParticle::eigenstateSpin('x', false));
+
+            std::cout << "\nSy eigenstates (eigenvalues +/-hbar/2):\n";
+            printSpinor("|y+>", QuantumParticle::eigenstateSpin('y', true));
+            printSpinor("|y->", QuantumParticle::eigenstateSpin('y', false));
+        }
+        else if (sp == 4) {
+            std::cout << "\n--- Spin Ladder Operators ---\n";
+            std::cout << "  S+ = Sx + i*Sy = hbar * [[0,1],[0,0]]\n";
+            std::cout << "  S- = Sx - i*Sy = hbar * [[0,0],[1,0]]\n\n";
+
+            std::cout << "  Action:\n";
+            std::cout << "  S+|down> = hbar|up>,    S+|up> = 0\n";
+            std::cout << "  S-|up>   = hbar|down>,  S-|down> = 0\n\n";
+
+            std::cout << "  Matrix form (hbar = " << hbar << "):\n";
+            auto Sp = QuantumParticle::spinRaising();
+            auto Sm = QuantumParticle::spinLowering();
+            std::cout << "  S+ = [" << Sp[0][0].real() << " " << Sp[0][1].real() << "]\n";
+            std::cout << "       [" << Sp[1][0].real() << " " << Sp[1][1].real() << "]\n\n";
+            std::cout << "  S- = [" << Sm[0][0].real() << " " << Sm[0][1].real() << "]\n";
+            std::cout << "       [" << Sm[1][0].real() << " " << Sm[1][1].real() << "]\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
+    }
+
+    // ===== 25: Addition of Angular Momentum =====
+    else if (choice == 25) {
+        std::cout << "\nAddition of Angular Momentum\n";
+        std::cout << "1 - General J1 + J2 coupling (Clebsch-Gordan)\n";
+        std::cout << "2 - Two spin-1/2 particles (singlet & triplet)\n";
+        std::cout << "Select: ";
+        int ac;
+        std::cin >> ac;
+
+        const double hbar = 1.0545718e-34;
+
+        if (ac == 1) {
+            double j1, j2;
+            std::cout << "j1 (e.g. 0.5, 1, 1.5, ...): "; std::cin >> j1;
+            std::cout << "j2 (e.g. 0.5, 1, 1.5, ...): "; std::cin >> j2;
+
+            auto jValues = QuantumParticle::listAllowedJ(j1, j2);
+            std::cout << "\n--- Angular Momentum Addition Theorem ---\n";
+            std::cout << "  j ranges from |j1-j2| = " << fabs(j1 - j2)
+                      << " to j1+j2 = " << j1 + j2 << "\n";
+            std::cout << "  Allowed j values: ";
+            for (double j : jValues) std::cout << j << " ";
+            std::cout << "\n\n";
+
+            int totalStates = 0;
+            for (double J : jValues) {
+                int deg = (int)(2 * J + 1 + 0.5);
+                totalStates += deg;
+                std::cout << "  j=" << J << ":  m = " << -J << " to " << J
+                          << "  (" << deg << " states)\n";
+            }
+            std::cout << "\n  Total coupled states: " << totalStates;
+            int uncoupled = (int)((2 * j1 + 1) * (2 * j2 + 1) + 0.5);
+            std::cout << "  (uncoupled: " << uncoupled << ")\n";
+
+            std::cout << "\n--- Clebsch-Gordan Coefficients ---\n";
+            std::cout << "  |j,m> = sum C(j1,m1;j2,m2|j,m) |j1,m1>|j2,m2>\n\n";
+
+            for (double J : jValues) {
+                for (double M = -J; M <= J + 0.01; M += 1.0) {
+                    std::cout << "  |" << J << "," << M << "> = ";
+                    bool first = true;
+                    for (double m1 = -j1; m1 <= j1 + 0.01; m1 += 1.0) {
+                        double m2 = M - m1;
+                        if (fabs(m2) > j2 + 0.01) continue;
+                        double cg = QuantumParticle::clebschGordan(j1, m1, j2, m2, J, M);
+                        if (fabs(cg) < 1e-10) continue;
+                        if (!first && cg > 0) std::cout << "+ ";
+                        if (cg < 0) std::cout << "- ";
+                        if (fabs(fabs(cg) - 1.0) > 1e-6)
+                            std::cout << fabs(cg);
+                        std::cout << "|" << m1 << "," << m2 << "> ";
+                        first = false;
+                    }
+                    std::cout << "\n";
+                }
+            }
+
+            particle.exportCoupledStatesCSV("clebsch_gordan.csv", j1, j2);
+            std::cout << "\nCG coefficients saved to clebsch_gordan.csv\n";
+        }
+        else if (ac == 2) {
+            std::cout << "\n--- Two Spin-1/2 Particles ---\n";
+            std::cout << "  S = S1 + S2,  s1 = s2 = 1/2\n";
+            std::cout << "  Allowed total spin: s = 0 (singlet), s = 1 (triplet)\n\n";
+
+            std::cout << "  TRIPLET (s=1, symmetric):\n";
+            std::cout << "    |1, 1>  = |up,up>\n";
+            std::cout << "    |1, 0>  = (|up,down> + |down,up>) / sqrt(2)\n";
+            std::cout << "    |1,-1>  = |down,down>\n\n";
+
+            std::cout << "  SINGLET (s=0, antisymmetric):\n";
+            std::cout << "    |0, 0>  = (|up,down> - |down,up>) / sqrt(2)\n\n";
+
+            std::cout << "  Eigenvalues:\n";
+            std::cout << "    Triplet: S^2 = 2*hbar^2 = " << 2.0 * hbar * hbar << " J^2*s^2\n";
+            std::cout << "    Singlet: S^2 = 0\n\n";
+
+            std::cout << "  Clebsch-Gordan coefficients:\n";
+            double j1 = 0.5, j2 = 0.5;
+            for (double J = 0; J <= 1.01; J += 1.0) {
+                for (double M = -J; M <= J + 0.01; M += 1.0) {
+                    std::cout << "    |" << J << "," << M << "> = ";
+                    bool first = true;
+                    for (double m1 = -0.5; m1 <= 0.51; m1 += 1.0) {
+                        double m2 = M - m1;
+                        if (fabs(m2) > 0.51) continue;
+                        double cg = QuantumParticle::clebschGordan(j1, m1, j2, m2, J, M);
+                        if (fabs(cg) < 1e-10) continue;
+                        if (!first && cg > 0) std::cout << "+ ";
+                        if (cg < 0) std::cout << "- ";
+                        double acg = fabs(cg);
+                        if (fabs(acg - 1.0) < 1e-6)
+                            std::cout << "";
+                        else if (fabs(acg - 1.0 / sqrt(2.0)) < 1e-6)
+                            std::cout << "1/sqrt(2) ";
+                        else
+                            std::cout << acg << " ";
+                        std::cout << "|" << (m1 > 0 ? "up" : "down") << ","
+                                  << (m2 > 0 ? "up" : "down") << "> ";
+                        first = false;
+                    }
+                    std::cout << "\n";
+                }
+            }
+
+            particle.exportSingletTripletCSV("singlet_triplet.csv");
+            std::cout << "\nSinglet/triplet states saved to singlet_triplet.csv\n";
+        }
+        else {
+            std::cout << "Invalid selection.\n";
+        }
     }
 
     return 0;
