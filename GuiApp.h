@@ -68,4 +68,9 @@ private:
     void renderSim27_DegPT();
     void renderSim28_IdenticalParticles();
     void renderSim29_Helium();
+    void renderSim30_WKB();
+    void renderSim31_TimeDependentPT();
+    void renderSim32_FullHydrogen();
+    void renderSim33_FineStructure();
+    void renderSim34_Zeeman();
 };

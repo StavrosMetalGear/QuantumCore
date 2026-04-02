@@ -205,6 +205,100 @@ public:
     static double heliumOptimalLambda();
     void exportHeliumVariationalCSV(const std::string& filename, int numPoints);
 
+    // ===== 30: WKB Approximation =====
+    // Bohr-Sommerfeld quantization condition for a general 1D potential V(x).
+    // Returns the WKB energy for quantum number n.
+    double wkbBohrSommerfeld(
+        double (*V)(double x, double param), double param,
+        double xMin, double xMax, int n, int numIntegPoints = 5000);
+
+    // WKB tunneling probability through a barrier V(x) between x1 and x2 at energy E.
+    double wkbTunnelingProbability(
+        double (*V)(double x, double param), double param,
+        double x1, double x2, double E, int numIntegPoints = 5000);
+
+    // Built-in WKB for common potentials
+    double wkbEnergyHarmonicOscillator(int n, double omega);
+    double wkbEnergyLinearPotential(int n, double F);
+    double wkbTunnelingBarrier(double E, double V0, double a);
+    void exportWKBComparisonCSV(const std::string& filename, double omega, int maxN);
+
+    // ===== 31: Time-Dependent Perturbation Theory =====
+    // Transition probability P_{i->f} under sinusoidal perturbation at time t.
+    static double transitionProbSinusoidal(
+        double Vfi, double omega, double omega0, double t);
+
+    // Fermi's golden rule: transition rate Gamma = (2pi/hbar) |V_fi|^2 rho(E_f).
+    static double fermiGoldenRuleRate(double Vfi, double densityOfStates);
+
+    // Rabi oscillation: P(t) for a two-level system driven at frequency omega.
+    static double rabiProbability(double Omega_R, double delta, double t);
+
+    void exportTransitionProbCSV(const std::string& filename,
+        double Vfi, double omega, double omega0, double tMax, int numPoints);
+    void exportRabiCSV(const std::string& filename,
+        double Omega_R, double delta, double tMax, int numPoints);
+
+    // ===== 32: Full Hydrogen Atom =====
+    // Associated Laguerre polynomial L_p^k(x)
+    static double associatedLaguerre(int p, int k, double x);
+
+    // Full normalized radial wavefunction R_nl(r) for hydrogen-like atom
+    double hydrogenRadialWavefunction(int n, int l, double r, double Z);
+
+    // Full wavefunction modulus |psi_nlm|^2 at (r, theta)
+    double hydrogenProbabilityDensity(int n, int l, int m,
+        double r, double theta, double Z);
+
+    // Expectation values <r>, <r^2>, <1/r>, <1/r^2> for state |n,l>
+    struct HydrogenExpectationValues {
+        double r_avg;       // <r>
+        double r2_avg;      // <r^2>
+        double inv_r_avg;   // <1/r>
+        double inv_r2_avg;  // <1/r^2>
+    };
+    HydrogenExpectationValues hydrogenExpectations(int n, int l, double Z);
+
+    void exportHydrogenRadialCSV(const std::string& filename,
+        int n, int l, double Z, int numPoints);
+    void exportHydrogenProbabilityCSV(const std::string& filename,
+        int n, int l, int m, double Z, int numR, int numTheta);
+
+    // ===== 33: Fine Structure of Hydrogen =====
+    struct FineStructureResult {
+        double E_Bohr;              // Bohr energy E_n
+        double E_relativistic;      // relativistic kinetic correction
+        double E_spinOrbit;         // spin-orbit coupling
+        double E_Darwin;            // Darwin term (l=0 only)
+        double E_total;             // total corrected energy
+    };
+    FineStructureResult computeFineStructure(int n, int l, double j, double Z);
+
+    // Lamb shift (approximate empirical formula for hydrogen n=2)
+    static double lambShift_n2();
+
+    void exportFineStructureCSV(const std::string& filename, int maxN, double Z);
+
+    // ===== 34: Zeeman Effect =====
+    struct ZeemanLevel {
+        int n, l;
+        double j, mj;
+        double E_noField;       // energy without B
+        double E_withField;     // energy with B
+        double g_j;             // Landé g-factor
+    };
+
+    static double landeGFactor(int l, double s, double j);
+
+    // Weak-field Zeeman splitting for hydrogen-like atom
+    std::vector<ZeemanLevel> computeZeemanLevels(int n, double Z, double B);
+
+    // Strong-field (Paschen-Back) splitting
+    std::vector<ZeemanLevel> computePaschenBackLevels(int n, double Z, double B);
+
+    void exportZeemanCSV(const std::string& filename, int n, double Z,
+        double Bmax, int numB);
+
 };
 
 

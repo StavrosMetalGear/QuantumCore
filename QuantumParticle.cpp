@@ -1934,3 +1934,489 @@ void QuantumParticle::exportHeliumVariationalCSV(const std::string& filename, in
     }
     out.close();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  30: WKB APPROXIMATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+double QuantumParticle::wkbBohrSommerfeld(
+    double (*V)(double, double), double param,
+    double xMin, double xMax, int n, int numPts)
+{
+    // Bohr-Sommerfeld: integral p(x)dx = (n + 1/2) pi hbar
+    // p(x) = sqrt(2m(E - V(x))) in the classically allowed region
+    // We solve for E by bisection.
+    const double hbar = 1.0545718e-34;
+    double target = (n + 0.5) * M_PI * hbar;
+
+    // Energy bounds: V_min < E < large value
+    double Vmin = V(xMin, param);
+    for (int i = 0; i <= numPts; ++i) {
+        double x = xMin + (xMax - xMin) * i / numPts;
+        double v = V(x, param);
+        if (v < Vmin) Vmin = v;
+    }
+
+    double Elow = Vmin + 1e-40;
+    double Ehigh = Vmin + 100.0 * target * target / (2.0 * mass * (xMax - xMin) * (xMax - xMin));
+
+    // Bisection: find E such that integral p dx = target
+    for (int iter = 0; iter < 200; ++iter) {
+        double Emid = 0.5 * (Elow + Ehigh);
+        double integral = 0.0;
+        double dx = (xMax - xMin) / numPts;
+        for (int i = 0; i <= numPts; ++i) {
+            double x = xMin + i * dx;
+            double diff = Emid - V(x, param);
+            if (diff > 0) {
+                double p = sqrt(2.0 * mass * diff);
+                double w = (i == 0 || i == numPts) ? 0.5 : 1.0;
+                integral += w * p * dx;
+            }
+        }
+        if (integral < target)
+            Elow = Emid;
+        else
+            Ehigh = Emid;
+    }
+    return 0.5 * (Elow + Ehigh);
+}
+
+double QuantumParticle::wkbTunnelingProbability(
+    double (*V)(double, double), double param,
+    double x1, double x2, double E, int numPts)
+{
+    // T ~ exp(-2 gamma) where gamma = (1/hbar) integral sqrt(2m(V-E)) dx
+    const double hbar = 1.0545718e-34;
+    double dx = (x2 - x1) / numPts;
+    double gamma = 0.0;
+    for (int i = 0; i <= numPts; ++i) {
+        double x = x1 + i * dx;
+        double diff = V(x, param) - E;
+        if (diff > 0) {
+            double w = (i == 0 || i == numPts) ? 0.5 : 1.0;
+            gamma += w * sqrt(2.0 * mass * diff) * dx;
+        }
+    }
+    gamma /= hbar;
+    return exp(-2.0 * gamma);
+}
+
+double QuantumParticle::wkbEnergyHarmonicOscillator(int n, double omega)
+{
+    // Exact WKB for HO gives E_n = hbar * omega * (n + 1/2)
+    // (WKB is exact for the harmonic oscillator)
+    const double hbar = 1.0545718e-34;
+    return hbar * omega * (n + 0.5);
+}
+
+double QuantumParticle::wkbEnergyLinearPotential(int n, double F)
+{
+    // V(x) = F|x| for x>0 (with wall at x=0)
+    // Turning point: x_t = E/F
+    // Bohr-Sommerfeld: integral_0^{x_t} sqrt(2m(E - Fx)) dx = (n - 1/4) pi hbar
+    // => E_n = (3 pi hbar F / (2 sqrt(2m)))^{2/3} * (n - 1/4)^{2/3}
+    const double hbar = 1.0545718e-34;
+    double prefactor = pow(3.0 * M_PI * hbar * F / (2.0 * sqrt(2.0 * mass)), 2.0 / 3.0);
+    return prefactor * pow(n - 0.25, 2.0 / 3.0);
+}
+
+double QuantumParticle::wkbTunnelingBarrier(double E, double V0, double a)
+{
+    // Rectangular barrier of height V0, half-width a centered at origin
+    // gamma = a * sqrt(2m(V0 - E)) / hbar
+    if (E >= V0) return 1.0;
+    const double hbar = 1.0545718e-34;
+    double kappa = sqrt(2.0 * mass * (V0 - E)) / hbar;
+    double gamma = kappa * 2.0 * a;  // full width = 2a
+    return exp(-2.0 * gamma);
+}
+
+void QuantumParticle::exportWKBComparisonCSV(const std::string& filename, double omega, int maxN)
+{
+    const double hbar = 1.0545718e-34;
+    std::ofstream out(filename);
+    out << "n,E_exact,E_wkb,error_percent\n";
+    for (int n = 0; n <= maxN; ++n) {
+        double Eexact = hbar * omega * (n + 0.5);
+        double Ewkb = wkbEnergyHarmonicOscillator(n, omega);
+        double err = fabs(Ewkb - Eexact) / fabs(Eexact) * 100.0;
+        out << n << "," << Eexact << "," << Ewkb << "," << err << "\n";
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  31: TIME-DEPENDENT PERTURBATION THEORY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+double QuantumParticle::transitionProbSinusoidal(
+    double Vfi, double omega, double omega0, double t)
+{
+    // P_{i->f}(t) = (|V_fi|^2 / hbar^2) * sin^2((omega0 - omega)*t/2)
+    //                                       / ((omega0 - omega)/2)^2
+    const double hbar = 1.0545718e-34;
+    double delta = omega0 - omega;
+    double sinc_part;
+    if (fabs(delta) < 1e-30) {
+        // On resonance: P = |V_fi|^2 * t^2 / hbar^2
+        sinc_part = t * t;
+    } else {
+        sinc_part = sin(delta * t / 2.0) * sin(delta * t / 2.0)
+                    / (delta * delta / 4.0);
+    }
+    return Vfi * Vfi / (hbar * hbar) * sinc_part;
+}
+
+double QuantumParticle::fermiGoldenRuleRate(double Vfi, double densityOfStates)
+{
+    // Gamma = (2 pi / hbar) |V_fi|^2 rho(E_f)
+    const double hbar = 1.0545718e-34;
+    return 2.0 * M_PI / hbar * Vfi * Vfi * densityOfStates;
+}
+
+double QuantumParticle::rabiProbability(double Omega_R, double delta, double t)
+{
+    // P(t) = (Omega_R^2 / Omega_eff^2) * sin^2(Omega_eff * t / 2)
+    // where Omega_eff = sqrt(Omega_R^2 + delta^2)
+    double Omega_eff = sqrt(Omega_R * Omega_R + delta * delta);
+    double ratio = Omega_R / Omega_eff;
+    return ratio * ratio * sin(Omega_eff * t / 2.0) * sin(Omega_eff * t / 2.0);
+}
+
+void QuantumParticle::exportTransitionProbCSV(const std::string& filename,
+    double Vfi, double omega, double omega0, double tMax, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "t,P_transition\n";
+    for (int i = 0; i <= numPoints; ++i) {
+        double t = tMax * i / numPoints;
+        double P = transitionProbSinusoidal(Vfi, omega, omega0, t);
+        out << t << "," << P << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportRabiCSV(const std::string& filename,
+    double Omega_R, double delta, double tMax, int numPoints)
+{
+    std::ofstream out(filename);
+    out << "t,P_rabi\n";
+    for (int i = 0; i <= numPoints; ++i) {
+        double t = tMax * i / numPoints;
+        double P = rabiProbability(Omega_R, delta, t);
+        out << t << "," << P << "\n";
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  32: FULL HYDROGEN ATOM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+double QuantumParticle::associatedLaguerre(int p, int k, double x)
+{
+    // L_p^k(x) via recurrence:
+    // L_0^k = 1
+    // L_1^k = 1 + k - x
+    // (p+1) L_{p+1}^k = (2p + 1 + k - x) L_p^k - (p + k) L_{p-1}^k
+    if (p == 0) return 1.0;
+    if (p == 1) return 1.0 + k - x;
+
+    double Lm1 = 1.0;
+    double L0  = 1.0 + k - x;
+    double Lp1 = 0.0;
+    for (int i = 1; i < p; ++i) {
+        Lp1 = ((2.0 * i + 1.0 + k - x) * L0 - (i + k) * Lm1) / (i + 1.0);
+        Lm1 = L0;
+        L0  = Lp1;
+    }
+    return L0;
+}
+
+double QuantumParticle::hydrogenRadialWavefunction(int n, int l, double r, double Z)
+{
+    // R_nl(r) = -sqrt( (2Z/(n*a0))^3 * (n-l-1)! / (2n*((n+l)!)^3) )
+    //           * e^{-rho/2} * rho^l * L_{n-l-1}^{2l+1}(rho)
+    // where rho = 2Zr / (n*a0)
+
+    const double a0 = 5.29177210903e-11;
+    double rho = 2.0 * Z * r / (n * a0);
+
+    // Normalization: sqrt((2Z/(n*a0))^3 * (n-l-1)! / (2n * ((n+l)!)^3))
+    // Use log-factorial for numerical stability
+    int p = n - l - 1;    // degree of Laguerre polynomial
+    int k = 2 * l + 1;    // associated Laguerre parameter
+
+    // Compute (n-l-1)! and (n+l)!
+    double log_num = log(2.0 * Z / (n * a0)) * 3.0;  // ln((2Z/na0)^3)
+    double log_fact_p = 0;
+    for (int i = 2; i <= p; ++i) log_fact_p += log((double)i);
+    double log_fact_npl = 0;
+    for (int i = 2; i <= n + l; ++i) log_fact_npl += log((double)i);
+
+    double log_norm = 0.5 * (log_num + log_fact_p - log(2.0 * n) - 3.0 * log_fact_npl);
+    double norm = exp(log_norm);
+
+    double radial = norm * exp(-rho / 2.0) * pow(rho, l) * associatedLaguerre(p, k, rho);
+    return radial;
+}
+
+double QuantumParticle::hydrogenProbabilityDensity(int n, int l, int m,
+    double r, double theta, double Z)
+{
+    double R = hydrogenRadialWavefunction(n, l, r, Z);
+    auto Y = sphericalHarmonic(l, m, theta, 0.0);
+    double Ymod2 = std::norm(Y);  // |Y_l^m|^2
+
+    // |psi|^2 = |R|^2 * |Y|^2
+    return R * R * Ymod2;
+}
+
+QuantumParticle::HydrogenExpectationValues
+QuantumParticle::hydrogenExpectations(int n, int l, double Z)
+{
+    // Exact analytical results for hydrogen-like atom:
+    const double a0 = 5.29177210903e-11;
+    double a = a0 / Z;
+
+    HydrogenExpectationValues ev;
+    // <r> = (a/2)(3n^2 - l(l+1))
+    ev.r_avg = (a / 2.0) * (3.0 * n * n - l * (l + 1.0));
+    // <r^2> = (a^2 n^2 / 2)(5n^2 + 1 - 3l(l+1))
+    ev.r2_avg = (a * a * n * n / 2.0) * (5.0 * n * n + 1.0 - 3.0 * l * (l + 1.0));
+    // <1/r> = Z / (n^2 a0) = 1 / (n^2 a)
+    ev.inv_r_avg = 1.0 / (n * n * a);
+    // <1/r^2> = Z^2 / (n^3 (l+1/2) a0^2) = 1 / (n^3 (l+1/2) a^2)
+    ev.inv_r2_avg = 1.0 / (n * n * n * (l + 0.5) * a * a);
+    return ev;
+}
+
+void QuantumParticle::exportHydrogenRadialCSV(const std::string& filename,
+    int n, int l, double Z, int numPoints)
+{
+    const double a0 = 5.29177210903e-11;
+    double rMax = n * n * 4.0 * a0 / Z;
+    std::ofstream out(filename);
+    out << "r,R_nl,r2_R2\n";
+    for (int i = 1; i <= numPoints; ++i) {
+        double r = rMax * i / numPoints;
+        double R = hydrogenRadialWavefunction(n, l, r, Z);
+        out << r << "," << R << "," << r * r * R * R << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportHydrogenProbabilityCSV(const std::string& filename,
+    int n, int l, int m, double Z, int numR, int numTheta)
+{
+    const double a0 = 5.29177210903e-11;
+    double rMax = n * n * 4.0 * a0 / Z;
+    std::ofstream out(filename);
+    out << "r,theta,prob_density\n";
+    for (int i = 1; i <= numR; ++i) {
+        double r = rMax * i / numR;
+        for (int j = 0; j <= numTheta; ++j) {
+            double theta = M_PI * j / numTheta;
+            double pd = hydrogenProbabilityDensity(n, l, m, r, theta, Z);
+            out << r << "," << theta << "," << pd << "\n";
+        }
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  33: FINE STRUCTURE OF HYDROGEN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+QuantumParticle::FineStructureResult
+QuantumParticle::computeFineStructure(int n, int l, double j, double Z)
+{
+    // Fine structure constant
+    const double alpha = 1.0 / 137.035999084;
+    const double a0 = 5.29177210903e-11;
+    const double hbar = 1.0545718e-34;
+    const double eV = 1.602176634e-19;
+
+    FineStructureResult result;
+
+    // Bohr energy: E_n = -13.6 eV * Z^2 / n^2
+    double E1 = -13.6057 * eV;  // ground state energy of hydrogen
+    result.E_Bohr = E1 * Z * Z / (n * n);
+
+    // Expectation values (analytic)
+    auto ev = hydrogenExpectations(n, l, Z);
+    double s = 0.5;  // electron spin
+
+    // 1) Relativistic kinetic energy correction:
+    // E_rel = -(E_n^2 / (2mc^2)) * (4n/(l+1/2) - 3)
+    double mc2 = mass * 2.99792458e8 * 2.99792458e8;
+    result.E_relativistic = -(result.E_Bohr * result.E_Bohr / (2.0 * mc2))
+                            * (4.0 * n / (l + 0.5) - 3.0);
+
+    // 2) Spin-orbit coupling (l > 0 only):
+    // E_so = (E_n^2 / (mc^2)) * (n * [j(j+1) - l(l+1) - s(s+1)]) / (l(l+1/2)(l+1))
+    if (l > 0) {
+        double jj = j * (j + 1.0);
+        double ll = l * (l + 1.0);
+        double ss = s * (s + 1.0);
+        result.E_spinOrbit = (result.E_Bohr * result.E_Bohr / (mc2))
+                             * n * (jj - ll - ss)
+                             / (l * (l + 0.5) * (l + 1.0));
+    } else {
+        result.E_spinOrbit = 0.0;
+    }
+
+    // 3) Darwin term (l=0 only):
+    // E_Darwin = (2 E_n^2) / (n mc^2)  for l=0
+    if (l == 0) {
+        result.E_Darwin = 2.0 * result.E_Bohr * result.E_Bohr / (n * mc2);
+    } else {
+        result.E_Darwin = 0.0;
+    }
+
+    // The combined fine-structure formula (all three terms together):
+    // E_fs = (E_n * alpha^2 * Z^2) / n * (1/(j+1/2) - 3/(4n))
+    // This compact form is equivalent to summing the three corrections.
+    double E_fs_compact = result.E_Bohr * alpha * alpha * Z * Z / n
+                          * (1.0 / (j + 0.5) - 3.0 / (4.0 * n));
+
+    result.E_total = result.E_Bohr + E_fs_compact;
+
+    return result;
+}
+
+double QuantumParticle::lambShift_n2()
+{
+    // Lamb shift for hydrogen 2S_{1/2} - 2P_{1/2}: ~1057.845 MHz
+    // E = h * nu
+    return 6.62607015e-34 * 1057.845e6;
+}
+
+void QuantumParticle::exportFineStructureCSV(const std::string& filename, int maxN, double Z)
+{
+    const double eV = 1.602176634e-19;
+    std::ofstream out(filename);
+    out << "n,l,j,E_Bohr_eV,E_rel_eV,E_so_eV,E_Darwin_eV,E_total_eV\n";
+
+    for (int n = 1; n <= maxN; ++n) {
+        for (int l = 0; l < n; ++l) {
+            double jMin = fabs(l - 0.5);
+            double jMax = l + 0.5;
+            for (double j = jMin; j <= jMax + 0.01; j += 1.0) {
+                auto fs = computeFineStructure(n, l, j, Z);
+                out << n << "," << l << "," << j << ","
+                    << fs.E_Bohr / eV << ","
+                    << fs.E_relativistic / eV << ","
+                    << fs.E_spinOrbit / eV << ","
+                    << fs.E_Darwin / eV << ","
+                    << fs.E_total / eV << "\n";
+            }
+        }
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  34: ZEEMAN EFFECT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+double QuantumParticle::landeGFactor(int l, double s, double j)
+{
+    // g_J = 1 + [j(j+1) + s(s+1) - l(l+1)] / [2j(j+1)]
+    if (j < 0.01) return 0.0;
+    double jj = j * (j + 1.0);
+    double ll = l * (l + 1.0);
+    double ss = s * (s + 1.0);
+    return 1.0 + (jj + ss - ll) / (2.0 * jj);
+}
+
+std::vector<QuantumParticle::ZeemanLevel>
+QuantumParticle::computeZeemanLevels(int n, double Z, double B)
+{
+    // Weak-field Zeeman: E = E_fs + g_J * mu_B * m_j * B
+    const double muB = 9.2740100783e-24;  // Bohr magneton in J/T
+
+    std::vector<ZeemanLevel> levels;
+
+    for (int l = 0; l < n; ++l) {
+        double jMin = fabs(l - 0.5);
+        double jMax = l + 0.5;
+        for (double j = jMin; j <= jMax + 0.01; j += 1.0) {
+            auto fs = computeFineStructure(n, l, j, Z);
+            double gJ = landeGFactor(l, 0.5, j);
+
+            // m_j ranges from -j to +j
+            for (double mj = -j; mj <= j + 0.01; mj += 1.0) {
+                ZeemanLevel lev;
+                lev.n = n;
+                lev.l = l;
+                lev.j = j;
+                lev.mj = mj;
+                lev.g_j = gJ;
+                lev.E_noField = fs.E_total;
+                lev.E_withField = fs.E_total + gJ * muB * mj * B;
+                levels.push_back(lev);
+            }
+        }
+    }
+    return levels;
+}
+
+std::vector<QuantumParticle::ZeemanLevel>
+QuantumParticle::computePaschenBackLevels(int n, double Z, double B)
+{
+    // Strong-field limit: L and S decouple.
+    // E = E_Bohr + mu_B * B * (m_l + 2*m_s) + fine-structure corrections
+    const double muB = 9.2740100783e-24;
+    const double alpha = 1.0 / 137.035999084;
+    const double eV = 1.602176634e-19;
+    double E_Bohr = -13.6057 * eV * Z * Z / (n * n);
+
+    std::vector<ZeemanLevel> levels;
+
+    for (int l = 0; l < n; ++l) {
+        for (int ml = -l; ml <= l; ++ml) {
+            for (int ms2 = -1; ms2 <= 1; ms2 += 2) {
+                double ms = ms2 * 0.5;
+                double mj = ml + ms;
+
+                ZeemanLevel lev;
+                lev.n = n;
+                lev.l = l;
+                lev.j = 0;     // not well-defined in Paschen-Back
+                lev.mj = mj;
+                lev.g_j = 0;
+
+                lev.E_noField = E_Bohr;
+                lev.E_withField = E_Bohr + muB * B * (ml + 2.0 * ms);
+                levels.push_back(lev);
+            }
+        }
+    }
+    return levels;
+}
+
+void QuantumParticle::exportZeemanCSV(const std::string& filename, int n, double Z,
+    double Bmax, int numB)
+{
+    const double eV = 1.602176634e-19;
+    const double muB = 9.2740100783e-24;
+
+    // Get all (n,l,j,mj) states
+    auto levels0 = computeZeemanLevels(n, Z, 0.0);
+
+    std::ofstream out(filename);
+    out << "B,n,l,j,mj,g_j,E_eV\n";
+
+    for (int ib = 0; ib <= numB; ++ib) {
+        double B = Bmax * ib / numB;
+        for (auto& lev : levels0) {
+            double E = lev.E_noField + lev.g_j * muB * lev.mj * B;
+            out << B << "," << lev.n << "," << lev.l << ","
+                << lev.j << "," << lev.mj << "," << lev.g_j << ","
+                << E / eV << "\n";
+        }
+    }
+    out.close();
+}

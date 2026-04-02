@@ -135,9 +135,14 @@ void GuiApp::renderSidebar()
         "27  Degen. Pert. Theory",
         "28  Identical Particles",
         "29  Helium & Variational",
+        "30  WKB Approximation",
+        "31  Time-Dep. Pert. Theory",
+        "32  Full Hydrogen Atom",
+        "33  Fine Structure",
+        "34  Zeeman Effect",
     };
 
-    for (int i = 0; i < 29; ++i) {
+    for (int i = 0; i < 34; ++i) {
         if (ImGui::Selectable(names[i], selectedSim == i))
             selectedSim = i;
     }
@@ -181,6 +186,11 @@ void GuiApp::renderParameters()
     case 26: renderSim27_DegPT();             break;
     case 27: renderSim28_IdenticalParticles();break;
     case 28: renderSim29_Helium();            break;
+    case 29: renderSim30_WKB();              break;
+    case 30: renderSim31_TimeDependentPT();  break;
+    case 31: renderSim32_FullHydrogen();     break;
+    case 32: renderSim33_FineStructure();    break;
+    case 33: renderSim34_Zeeman();           break;
     default: break;
     }
 
@@ -1600,5 +1610,406 @@ void GuiApp::renderSim29_Helium()
         ImGui::SameLine();
         if (ImGui::Button("Export CSV"))
             particle.exportHeliumVariationalCSV("helium_variational.csv", 200);
+    }
+}
+
+// ── 30: WKB Approximation ──────────────────────────────────────────────────
+void GuiApp::renderSim30_WKB()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "WKB Approximation");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("Application", &mode,
+                 "HO: WKB vs exact\0Linear potential energies\0Barrier tunneling\0");
+
+    if (mode == 0) {
+        static int maxN = 10;
+        static double omega = 1e15;
+        ImGui::InputInt("Max n", &maxN); if (maxN < 0) maxN = 0;
+        ImGui::InputDouble("omega (rad/s)", &omega, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            std::ostringstream o;
+            o << "Bohr-Sommerfeld quantization:\n"
+              << "  integral p dx = (n + 1/2) pi hbar\n\n"
+              << "HO: WKB is EXACT (E_wkb = E_exact)\n\n"
+              << "n      E_exact (J)       E_wkb (J)\n";
+            for (int n = 0; n <= maxN; ++n) {
+                double Ee = particle.computeEnergy1DHarmonicOscillator(n, omega);
+                double Ew = particle.wkbEnergyHarmonicOscillator(n, omega);
+                o << n << "   " << Ee << "   " << Ew << "\n";
+            }
+            resultText = o.str();
+
+            clearPlot();
+            std::vector<double> nv(maxN + 1), ev(maxN + 1), wv(maxN + 1);
+            for (int n = 0; n <= maxN; ++n) {
+                nv[n] = n;
+                ev[n] = particle.computeEnergy1DHarmonicOscillator(n, omega);
+                wv[n] = particle.wkbEnergyHarmonicOscillator(n, omega);
+            }
+            addCurve("E_exact", nv, ev);
+            addCurve("E_WKB", nv, wv);
+            plotTitle  = "WKB vs Exact (HO)";
+            plotXLabel = "n";
+            plotYLabel = "E (J)";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportWKBComparisonCSV("wkb_comparison.csv", omega, maxN);
+    }
+    else if (mode == 1) {
+        static int maxN = 10;
+        static double F = 1e10;
+        ImGui::InputInt("Max n", &maxN); if (maxN < 1) maxN = 1;
+        ImGui::InputDouble("Field F (J/m)", &F, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            std::ostringstream o;
+            o << "Linear potential V = F|x|, wall at x=0\n"
+              << "E_n = c * (n - 1/4)^{2/3}\n\n"
+              << "n     E_wkb (J)\n";
+            clearPlot();
+            std::vector<double> nv, ev;
+            for (int n = 1; n <= maxN; ++n) {
+                double E = particle.wkbEnergyLinearPotential(n, F);
+                o << n << "   " << E << "\n";
+                nv.push_back(n);
+                ev.push_back(E);
+            }
+            resultText = o.str();
+            addCurve("E_wkb", nv, ev);
+            plotTitle  = "WKB Linear Potential";
+            plotXLabel = "n";
+            plotYLabel = "E (J)";
+        }
+    }
+    else {
+        static double E  = 5e-19;
+        static double V0 = 1e-18;
+        static double a  = 1e-10;
+        ImGui::InputDouble("Particle E (J)", &E,  0, 0, "%.3e");
+        ImGui::InputDouble("Barrier V0 (J)", &V0, 0, 0, "%.3e");
+        ImGui::InputDouble("Half-width a (m)", &a, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            double Twkb = particle.wkbTunnelingBarrier(E, V0, a);
+            auto [Rexact, Texact] = particle.computeBarrierRT(E, V0, a);
+            std::ostringstream o;
+            o << "WKB tunneling: T_wkb ~ exp(-2 gamma)\n\n"
+              << "T_WKB  = " << Twkb << "\n"
+              << "T_exact = " << Texact << "\n"
+              << "R_exact = " << Rexact << "\n";
+            resultText = o.str();
+
+            clearPlot();
+            int N = 200;
+            std::vector<double> ev(N), tv(N), tw(N);
+            for (int i = 0; i < N; ++i) {
+                ev[i] = V0 * 0.01 + V0 * 0.98 * i / (N - 1);
+                tw[i] = particle.wkbTunnelingBarrier(ev[i], V0, a);
+                auto [Ri, Ti] = particle.computeBarrierRT(ev[i], V0, a);
+                tv[i] = Ti;
+            }
+            addCurve("T_WKB", ev, tw);
+            addCurve("T_exact", ev, tv);
+            plotTitle  = "Tunneling: WKB vs Exact";
+            plotXLabel = "E (J)";
+            plotYLabel = "T";
+        }
+    }
+}
+
+// ── 31: Time-Dependent Perturbation Theory ─────────────────────────────────
+void GuiApp::renderSim31_TimeDependentPT()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Time-Dependent Perturbation Theory");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("View", &mode,
+                 "Transition probability\0Fermi's golden rule\0Rabi oscillations\0");
+
+    if (mode == 0) {
+        static double Vfi = 1e-22;
+        static double omega = 1e15, omega0 = 1.01e15;
+        static double tMax = 1e-13;
+        ImGui::InputDouble("|V_fi| (J)", &Vfi, 0, 0, "%.3e");
+        ImGui::InputDouble("Drive omega (rad/s)", &omega, 0, 0, "%.3e");
+        ImGui::InputDouble("Resonance omega0", &omega0, 0, 0, "%.3e");
+        ImGui::InputDouble("t_max (s)", &tMax, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            std::ostringstream o;
+            o << "P_{i->f}(t) = |V_fi|^2/hbar^2 * sin^2((w0-w)t/2) / ((w0-w)/2)^2\n\n"
+              << "Detuning: omega0 - omega = " << omega0 - omega << " rad/s\n";
+            double Pmax = QuantumParticle::transitionProbSinusoidal(Vfi, omega, omega0, M_PI / fabs(omega0 - omega + 1e-40));
+            o << "P_max ~ " << Pmax << "\n";
+            resultText = o.str();
+
+            clearPlot();
+            int N = 500;
+            std::vector<double> tv(N), pv(N);
+            for (int i = 0; i < N; ++i) {
+                tv[i] = tMax * i / (N - 1);
+                pv[i] = QuantumParticle::transitionProbSinusoidal(Vfi, omega, omega0, tv[i]);
+            }
+            addCurve("P(t)", tv, pv);
+            plotTitle  = "Transition Probability";
+            plotXLabel = "t (s)";
+            plotYLabel = "P";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportTransitionProbCSV("transition_prob.csv", Vfi, omega, omega0, tMax, 500);
+    }
+    else if (mode == 1) {
+        static double Vfi = 1e-22;
+        static double rho = 1e15;
+        ImGui::InputDouble("|V_fi| (J)", &Vfi, 0, 0, "%.3e");
+        ImGui::InputDouble("rho(E_f) (1/J)", &rho, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            double Gamma = QuantumParticle::fermiGoldenRuleRate(Vfi, rho);
+            std::ostringstream o;
+            o << "Fermi's Golden Rule:\n"
+              << "  Gamma = (2pi/hbar) |V_fi|^2 rho(E_f)\n\n"
+              << "  Gamma = " << Gamma << " s^-1\n"
+              << "  Lifetime tau = 1/Gamma = " << 1.0 / Gamma << " s\n";
+            resultText = o.str();
+            clearPlot();
+        }
+    }
+    else {
+        static double Omega_R = 1e13, delta = 0, tMax = 1e-12;
+        ImGui::InputDouble("Rabi freq Omega_R (rad/s)", &Omega_R, 0, 0, "%.3e");
+        ImGui::InputDouble("Detuning delta (rad/s)", &delta, 0, 0, "%.3e");
+        ImGui::InputDouble("t_max (s)", &tMax, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            double Omega_eff = sqrt(Omega_R * Omega_R + delta * delta);
+            std::ostringstream o;
+            o << "Rabi oscillations:\n"
+              << "  P(t) = (Omega_R/Omega_eff)^2 sin^2(Omega_eff*t/2)\n\n"
+              << "  Omega_eff = sqrt(Omega_R^2 + delta^2) = " << Omega_eff << " rad/s\n"
+              << "  Period = " << 2.0 * M_PI / Omega_eff << " s\n"
+              << "  P_max = " << (Omega_R * Omega_R) / (Omega_eff * Omega_eff) << "\n";
+            if (fabs(delta) < 1e-20)
+                o << "  On resonance: P_max = 1 (complete population inversion)\n";
+            resultText = o.str();
+
+            clearPlot();
+            int N = 500;
+            std::vector<double> tv(N), pv(N);
+            for (int i = 0; i < N; ++i) {
+                tv[i] = tMax * i / (N - 1);
+                pv[i] = QuantumParticle::rabiProbability(Omega_R, delta, tv[i]);
+            }
+            addCurve("P_Rabi(t)", tv, pv);
+            plotTitle  = "Rabi Oscillations";
+            plotXLabel = "t (s)";
+            plotYLabel = "P";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportRabiCSV("rabi_oscillations.csv", Omega_R, delta, tMax, 500);
+    }
+}
+
+// ── 32: Full Hydrogen Atom ─────────────────────────────────────────────────
+void GuiApp::renderSim32_FullHydrogen()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Full Hydrogen Atom");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("View", &mode,
+                 "Radial wavefunction R_nl\0Probability density |psi|^2\0Expectation values\0");
+
+    static int n = 1, l = 0, m = 0;
+    static double Z = 1.0;
+    ImGui::InputInt("n", &n); if (n < 1) n = 1;
+    ImGui::InputInt("l", &l); if (l < 0) l = 0; if (l >= n) l = n - 1;
+    ImGui::InputInt("m", &m); if (m < -l) m = -l; if (m > l) m = l;
+    ImGui::InputDouble("Z", &Z);
+
+    if (mode == 0) {
+        if (ImGui::Button("Compute")) {
+            std::ostringstream o;
+            o << "R_" << n << l << "(r) for Z = " << Z << "\n"
+              << "Nodes: n - l - 1 = " << (n - l - 1) << "\n";
+            resultText = o.str();
+
+            clearPlot();
+            int N = 500;
+            double a0 = 5.29177e-11;
+            double rMax = n * n * 4.0 * a0 / Z;
+            std::vector<double> rv(N), Rv(N), r2R2(N);
+            for (int i = 0; i < N; ++i) {
+                rv[i]   = rMax * (i + 1.0) / N;
+                Rv[i]   = particle.hydrogenRadialWavefunction(n, l, rv[i], Z);
+                r2R2[i] = rv[i] * rv[i] * Rv[i] * Rv[i];
+            }
+            addCurve("R_nl(r)", rv, Rv);
+            addCurve("r^2 |R|^2", rv, r2R2);
+            plotTitle  = "Hydrogen Radial Wavefunction";
+            plotXLabel = "r (m)";
+            plotYLabel = "R / r^2|R|^2";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportHydrogenRadialCSV("hydrogen_radial.csv", n, l, Z, 500);
+    }
+    else if (mode == 1) {
+        if (ImGui::Button("Compute")) {
+            std::ostringstream o;
+            o << "|psi_" << n << l << m << "|^2 (r, theta)\n"
+              << "Exported to CSV (r, theta grid).\n";
+            resultText = o.str();
+            clearPlot();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportHydrogenProbabilityCSV("hydrogen_prob.csv", n, l, m, Z, 100, 50);
+    }
+    else {
+        if (ImGui::Button("Compute")) {
+            auto ev = particle.hydrogenExpectations(n, l, Z);
+            double a0 = 5.29177e-11;
+            std::ostringstream o;
+            o << "Exact analytical expectation values for |" << n << "," << l << ">:\n\n"
+              << "  <r>    = " << ev.r_avg << " m  (" << ev.r_avg / a0 << " a0)\n"
+              << "  <r^2>  = " << ev.r2_avg << " m^2\n"
+              << "  <1/r>  = " << ev.inv_r_avg << " 1/m\n"
+              << "  <1/r^2>= " << ev.inv_r2_avg << " 1/m^2\n\n"
+              << "Most probable radius (1s): a0/Z = " << a0 / Z << " m\n";
+            resultText = o.str();
+            clearPlot();
+        }
+    }
+}
+
+// ── 33: Fine Structure ─────────────────────────────────────────────────────
+void GuiApp::renderSim33_FineStructure()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Fine Structure of Hydrogen");
+    ImGui::Separator();
+
+    static int n = 2;
+    static double Z = 1.0;
+    ImGui::InputInt("n", &n); if (n < 1) n = 1;
+    ImGui::InputDouble("Z", &Z);
+
+    if (ImGui::Button("Compute")) {
+        std::ostringstream o;
+        o << "Fine structure: E_fs = E_Bohr + E_rel + E_so + E_Darwin\n"
+          << "Combined: E = E_n [1 + (alpha*Z)^2/n * (1/(j+1/2) - 3/(4n))]\n\n"
+          << "n  l  j      E_Bohr (eV)     E_total (eV)    shift (eV)\n"
+          << "-- -- ----   -----------     -----------     -----------\n";
+
+        clearPlot();
+        std::vector<double> stateIdx, energies;
+        int idx = 0;
+        for (int ll = 0; ll < n; ++ll) {
+            double jMin = fabs(ll - 0.5);
+            double jMax = ll + 0.5;
+            for (double j = jMin; j <= jMax + 0.01; j += 1.0) {
+                auto fs = particle.computeFineStructure(n, ll, j, Z);
+                o << n << "  " << ll << "  " << j << "    "
+                  << fs.E_Bohr / EV << "    " << fs.E_total / EV << "    "
+                  << (fs.E_total - fs.E_Bohr) / EV << "\n";
+                stateIdx.push_back(idx++);
+                energies.push_back(fs.E_total / EV);
+            }
+        }
+
+        if (n == 2) {
+            double lamb = QuantumParticle::lambShift_n2();
+            o << "\nLamb shift (2S_1/2 - 2P_1/2): " << lamb / EV << " eV"
+              << " (" << lamb / 6.62607015e-34 / 1e6 << " MHz)\n";
+        }
+
+        resultText = o.str();
+        addCurve("E_fs (eV)", stateIdx, energies);
+        plotTitle  = "Fine Structure Levels";
+        plotXLabel = "state index";
+        plotYLabel = "E (eV)";
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Export CSV"))
+        particle.exportFineStructureCSV("fine_structure.csv", n, Z);
+}
+
+// ── 34: Zeeman Effect ──────────────────────────────────────────────────────
+void GuiApp::renderSim34_Zeeman()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Zeeman Effect");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("Regime", &mode,
+                 "Weak field (anomalous Zeeman)\0Strong field (Paschen-Back)\0");
+
+    static int n = 2;
+    static double Z = 1.0, B = 1.0;
+    ImGui::InputInt("n", &n); if (n < 1) n = 1;
+    ImGui::InputDouble("Z", &Z);
+    ImGui::InputDouble("B (Tesla)", &B);
+
+    if (mode == 0) {
+        if (ImGui::Button("Compute")) {
+            auto levels = particle.computeZeemanLevels(n, Z, B);
+            std::ostringstream o;
+            o << "Weak-field Zeeman: E = E_fs + g_J * mu_B * m_j * B\n\n"
+              << "l   j     mj    g_J    E_noB (eV)     E(B) (eV)\n"
+              << "--- ----  ----  -----  -----------    -----------\n";
+            for (auto& lev : levels) {
+                o << lev.l << "   " << lev.j << "   " << lev.mj << "   "
+                  << lev.g_j << "   " << lev.E_noField / EV << "   "
+                  << lev.E_withField / EV << "\n";
+            }
+            resultText = o.str();
+
+            clearPlot();
+            // Plot: energy vs B for each sublevel
+            int NB = 200;
+            double Bmax = B * 2.0;
+            auto levels0 = particle.computeZeemanLevels(n, Z, 0.0);
+            double muB = 9.2740100783e-24;
+            for (auto& lev : levels0) {
+                std::vector<double> bv(NB), ev(NB);
+                for (int i = 0; i < NB; ++i) {
+                    bv[i] = Bmax * i / (NB - 1);
+                    ev[i] = (lev.E_noField + lev.g_j * muB * lev.mj * bv[i]) / EV;
+                }
+                std::string label = "l=" + std::to_string(lev.l) + " j=" +
+                    std::to_string(lev.j).substr(0, 3) + " mj=" +
+                    std::to_string(lev.mj).substr(0, 4);
+                addCurve(label, bv, ev);
+            }
+            plotTitle  = "Zeeman Splitting";
+            plotXLabel = "B (T)";
+            plotYLabel = "E (eV)";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportZeemanCSV("zeeman_levels.csv", n, Z, B * 2.0, 200);
+    }
+    else {
+        if (ImGui::Button("Compute")) {
+            auto levels = particle.computePaschenBackLevels(n, Z, B);
+            std::ostringstream o;
+            o << "Paschen-Back (strong field): L,S decouple\n"
+              << "E = E_Bohr + mu_B * B * (m_l + 2*m_s)\n\n"
+              << "l   m_j   E(B) (eV)\n"
+              << "--- ----  ----------\n";
+            for (auto& lev : levels) {
+                o << lev.l << "   " << lev.mj << "   "
+                  << lev.E_withField / EV << "\n";
+            }
+            resultText = o.str();
+            clearPlot();
+        }
     }
 }
