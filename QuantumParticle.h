@@ -299,6 +299,119 @@ public:
     void exportZeemanCSV(const std::string& filename, int n, double Z,
         double Bmax, int numB);
 
+    // ===== 35: Partial Wave Analysis =====
+    // Spherical Neumann function n_l(x)
+    static double sphericalNeumannN(int l, double x);
+
+    // Phase shift delta_l for scattering off a hard sphere of radius a
+    static double phaseShiftHardSphere(int l, double k, double a);
+
+    // Phase shift for a finite spherical well of depth V0, radius a
+    double phaseShiftFiniteWell(int l, double E, double V0, double a);
+
+    // Partial-wave cross section sigma_l = (4pi/k^2)(2l+1)sin^2(delta_l)
+    static double partialWaveCrossSection(int l, double k, double delta_l);
+
+    // Total cross section summing partial waves up to lMax
+    double totalCrossSection(double E, double V0, double a, int lMax);
+
+    // Differential cross section dsigma/dOmega at angle theta
+    double differentialCrossSection(double E, double V0, double a, int lMax, double theta);
+
+    void exportPartialWaveCSV(const std::string& filename,
+        double V0, double a, int lMax, double Emax, int numE);
+    void exportDifferentialCSV(const std::string& filename,
+        double E, double V0, double a, int lMax, int numTheta);
+
+    // ===== 36: Born Approximation =====
+    // First Born amplitude f(theta) for a spherically symmetric potential
+    // V(r) = -V0 for r < a, 0 otherwise (finite spherical well)
+    static double bornAmplitudeSphericalWell(double q, double V0, double a, double mass);
+
+    // Born amplitude for Yukawa potential V(r) = -V0 * exp(-mu*r)/(mu*r)
+    static double bornAmplitudeYukawa(double q, double V0, double mu, double mass);
+
+    // Born amplitude for Coulomb (screened): f = -2mZe^2/(hbar^2 (q^2 + mu^2))
+    static double bornAmplitudeCoulomb(double q, double Z, double mass, double screening);
+
+    // Total Born cross section (spherical well, integrated analytically)
+    static double bornTotalCrossSectionSphericalWell(double k, double V0, double a, double mass);
+
+    void exportBornDifferentialCSV(const std::string& filename,
+        double E, double V0, double a, int numTheta);
+    void exportBornVsExactCSV(const std::string& filename,
+        double V0, double a, int lMax, double Emax, int numE);
+
+    // ===== 37: Transfer Matrix Method =====
+    struct TransferMatrixResult {
+        double T;   // transmission coefficient
+        double R;   // reflection coefficient
+    };
+
+    // Transfer matrix for a single rectangular layer
+    static void transferMatrixLayer(double k, double kp, double width,
+        double M[2][2]);
+
+    // Multi-layer potential: given layer widths, heights, compute T and R
+    TransferMatrixResult transferMatrixMultilayer(
+        double E,
+        const std::vector<double>& widths,
+        const std::vector<double>& heights);
+
+    // Resonant tunneling through double barrier
+    TransferMatrixResult resonantTunnelingDoubleBarrier(
+        double E, double V0, double barrierWidth, double wellWidth);
+
+    void exportTransferMatrixCSV(const std::string& filename,
+        const std::vector<double>& widths,
+        const std::vector<double>& heights,
+        double Emax, int numE);
+    void exportResonantTunnelingCSV(const std::string& filename,
+        double V0, double barrierWidth, double wellWidth,
+        double Emax, int numE);
+
+    // ===== 38: Density of States =====
+    // Free-particle density of states per unit volume/length/area
+    static double dos1D(double E, double mass);   // g(E) per unit length
+    static double dos2D(double mass);              // g(E) per unit area (constant)
+    static double dos3D(double E, double mass);    // g(E) per unit volume
+
+    // DOS for particle in a 1D box of length L (discrete, broadened)
+    double dosBox1D(double E, double L, int maxN, double broadening);
+
+    // DOS for 2D electron gas in a quantum well
+    static double dosQuantumWell2DEG(double E, double Lz, double mass, int maxSubbands);
+
+    void exportDOSFreeCSV(const std::string& filename,
+        double Emax, int numE);
+    void exportDOSQuantumWellCSV(const std::string& filename,
+        double Lz, double Emax, int maxSubbands, int numE);
+
+    // ===== 39: Coherent & Squeezed States =====
+    // Coherent state |alpha>: photon number distribution P(n) = e^{-|alpha|^2} |alpha|^{2n}/n!
+    static double coherentStatePhotonProb(double alphaMag, int n);
+
+    // Mean photon number and variance for coherent state
+    static double coherentStateMeanN(double alphaMag);
+    static double coherentStateVarianceN(double alphaMag);
+
+    // Coherent state wavefunction in position space (HO basis)
+    double coherentStateWavefunction(double alpha_r, double alpha_i,
+        double x, double omega, double t);
+
+    // Wigner function for coherent state W(x, p)
+    double wignerFunctionCoherent(double alpha_r, double alpha_i,
+        double x, double p, double omega);
+
+    // Squeezed state: uncertainty product
+    static double squeezedUncertaintyX(double r, double omega, double mass);
+    static double squeezedUncertaintyP(double r, double omega, double mass);
+
+    void exportCoherentStateCSV(const std::string& filename,
+        double alphaMag, double omega, int numX, int maxN);
+    void exportWignerCSV(const std::string& filename,
+        double alpha_r, double alpha_i, double omega, int numX, int numP);
+
 };
 
 
