@@ -239,6 +239,21 @@ void GuiApp::renderSim01_ISW()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Infinite Square Well");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A particle of mass m is confined to a one-dimensional box of length L with "
+            "infinitely high potential walls at x = 0 and x = L. Inside the box the potential "
+            "is zero, so the time-independent Schrodinger equation reduces to "
+            "-(hbar^2/2m) d^2psi/dx^2 = E psi. The boundary conditions psi(0) = psi(L) = 0 "
+            "select a discrete set of standing-wave solutions.\n\n"
+            "Energies:  E_n = n^2 pi^2 hbar^2 / (2 m L^2),  n = 1, 2, 3, ...\n"
+            "Wavefunctions:  psi_n(x) = sqrt(2/L) sin(n pi x / L)\n\n"
+            "Key features: (1) the ground state n=1 has nonzero energy (zero-point energy), "
+            "a direct consequence of the uncertainty principle; (2) the energy spacing grows "
+            "as n^2; (3) psi_n has (n-1) nodes inside the box."
+        );
+    }
+
     static int n = 1;
     ImGui::InputInt("Energy level n", &n);
     if (n < 1) n = 1;
@@ -273,6 +288,22 @@ void GuiApp::renderSim02_HO()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Harmonic Oscillator");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The quantum harmonic oscillator describes a particle in the potential "
+            "V(x) = (1/2) m omega^2 x^2. It is one of the few exactly solvable systems and "
+            "serves as the foundation for phonons, photons, and quantum field theory. The "
+            "Schrodinger equation is solved either by the power-series (Hermite polynomial) "
+            "method or elegantly via ladder operators a and a-dagger.\n\n"
+            "Energies:  E_n = hbar omega (n + 1/2),  n = 0, 1, 2, ...\n"
+            "Wavefunctions:  psi_n(x) = (m omega / pi hbar)^{1/4} (1/sqrt(2^n n!)) H_n(xi) e^{-xi^2/2}\n"
+            "  where xi = sqrt(m omega / hbar) x  and H_n are Hermite polynomials.\n\n"
+            "Key features: (1) equally spaced energy levels separated by hbar omega; "
+            "(2) zero-point energy E_0 = hbar omega / 2; (3) the ground state is a Gaussian "
+            "that saturates the uncertainty principle: Dx Dp = hbar/2."
+        );
+    }
 
     static int n = 0;
     static double omega = 1e15;
@@ -310,6 +341,21 @@ void GuiApp::renderSim03_FSW()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Finite Square Well");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A finite square well has potential V(x) = -V0 for |x| < a and V(x) = 0 outside. "
+            "Unlike the infinite well, the wavefunction does not vanish at the walls but "
+            "penetrates exponentially into the classically forbidden region, reflecting the "
+            "quantum tunneling phenomenon.\n\n"
+            "Bound states are found by matching psi and dpsi/dx at x = +/-a. For even solutions: "
+            "k tan(ka) = kappa;  for odd solutions: -k cot(ka) = kappa, where "
+            "k = sqrt(2m(V0+E))/hbar and kappa = sqrt(-2mE)/hbar.\n\n"
+            "Key features: (1) there is always at least one bound state for any V0 > 0; "
+            "(2) the number of bound states increases with V0 a^2; (3) the exponential tails "
+            "outside the well are a purely quantum effect with no classical analogue."
+        );
+    }
+
     static double V0 = 1e-18;
     ImGui::InputDouble("Potential depth V0 (J)", &V0, 0, 0, "%.3e");
 
@@ -336,6 +382,21 @@ void GuiApp::renderSim04_Coulomb()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Coulomb Potential");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The Coulomb potential V(r) = -Z e^2 / (4 pi epsilon_0 r) describes the "
+            "electrostatic attraction between a nucleus of charge Z and an electron. Solving "
+            "the radial Schrodinger equation in spherical coordinates yields the hydrogen-like "
+            "energy spectrum and associated Laguerre-polynomial wavefunctions.\n\n"
+            "Energies:  E_n = -13.6 eV * Z^2 / n^2,  n = 1, 2, 3, ...\n"
+            "Radial wavefunctions:  R_nl(r) ~ (2Zr/na0)^l e^{-Zr/na0} L_{n-l-1}^{2l+1}(2Zr/na0)\n"
+            "  where a0 = 0.529 Angstrom is the Bohr radius.\n\n"
+            "Key features: (1) the energy depends only on n (accidental degeneracy in l); "
+            "(2) each level has n^2 degenerate states (ignoring spin); (3) the radial wavefunction "
+            "has (n - l - 1) nodes."
+        );
+    }
 
     static int n = 1;
     static double Z = 1.0;
@@ -375,6 +436,20 @@ void GuiApp::renderSim05_Delta()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Delta Potential Well");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The Dirac delta potential V(x) = -alpha delta(x) is the idealization of a very "
+            "narrow, very deep well. Despite its singular nature it admits an exact solution "
+            "and illustrates key features of bound states and scattering in one dimension.\n\n"
+            "Bound state (alpha > 0):  E = -m alpha^2 / (2 hbar^2)\n"
+            "Wavefunction:  psi(x) = (m alpha / hbar^2)^{1/2} e^{-kappa|x|}  with kappa = m alpha / hbar^2\n"
+            "Scattering:  R = 1/(1 + 2hbar^2 E/(m alpha^2)),  T = 1 - R\n\n"
+            "Key features: (1) exactly one bound state for any attractive delta; (2) the "
+            "wavefunction has a cusp (discontinuous derivative) at x = 0; (3) transmission "
+            "through the delta approaches unity at high energy."
+        );
+    }
+
     static double V0 = 1e-28;
     ImGui::InputDouble("Strength V0 (J*m)", &V0, 0, 0, "%.3e");
 
@@ -395,6 +470,21 @@ void GuiApp::renderSim06_DoubleDelta()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Double Delta Potential");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Two attractive Dirac delta potentials V(x) = -alpha [delta(x+a) + delta(x-a)] "
+            "model a one-dimensional diatomic molecule. The system supports up to two bound "
+            "states: a symmetric (bonding) state and an antisymmetric (antibonding) state.\n\n"
+            "The transcendental equation for the bound-state energies follows from matching "
+            "boundary conditions at each delta. For large separation the two levels approach "
+            "the single-delta energy; as the deltas merge, the symmetric state deepens while "
+            "the antisymmetric state may become unbound.\n\n"
+            "Key features: (1) illustrates molecular bonding and antibonding in the simplest "
+            "setting; (2) energy splitting depends exponentially on separation; (3) the "
+            "symmetric state is always more tightly bound than the antisymmetric one."
+        );
+    }
 
     static double V0 = 1e-28;
     static double a  = 1e-10;
@@ -419,6 +509,21 @@ void GuiApp::renderSim07_Step()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Step Potential");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A step potential V(x) = 0 for x < 0 and V(x) = V0 for x > 0 is the simplest "
+            "scattering problem. A plane wave incident from the left is partly reflected and "
+            "partly transmitted (or evanescent) at the step.\n\n"
+            "For E > V0: k1 = sqrt(2mE)/hbar, k2 = sqrt(2m(E-V0))/hbar\n"
+            "  R = |(k1-k2)/(k1+k2)|^2,  T = 4 k1 k2 / (k1+k2)^2\n"
+            "For E < V0: the wave decays exponentially in region II with "
+            "kappa = sqrt(2m(V0-E))/hbar, giving T = 0 and R = 1.\n\n"
+            "Key features: (1) partial reflection even when E > V0 (no classical analogue); "
+            "(2) for E < V0 the particle penetrates a distance ~1/kappa into the barrier; "
+            "(3) R + T = 1 (probability conservation) always holds."
+        );
+    }
+
     static double E = 1e-18;
     static double V0 = 5e-19;
     ImGui::InputDouble("Particle energy E (J)", &E,  0, 0, "%.3e");
@@ -438,6 +543,22 @@ void GuiApp::renderSim08_Barrier()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Square Potential Barrier");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A rectangular barrier V(x) = V0 for |x| < a and 0 otherwise models quantum "
+            "tunneling, one of the most striking predictions of quantum mechanics. A particle "
+            "with E < V0 has a nonzero probability of appearing on the far side of the barrier.\n\n"
+            "Transmission coefficient (E < V0):\n"
+            "  T = [1 + V0^2 sinh^2(kappa a) / (4E(V0-E))]^{-1}\n"
+            "  where kappa = sqrt(2m(V0-E))/hbar.\n"
+            "For E > V0 the sinh is replaced by sin and the particle oscillates inside.\n\n"
+            "Key features: (1) T is exponentially small for thick or tall barriers; "
+            "(2) resonant transmission (T = 1) occurs when an integer number of half-waves "
+            "fits inside the barrier (E > V0); (3) tunneling underpins alpha decay, STM, "
+            "and Josephson junctions."
+        );
+    }
 
     static double E  = 1e-18;
     static double V0 = 5e-19;
@@ -461,6 +582,21 @@ void GuiApp::renderSim09_Triangular()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Triangular Well Potential");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A triangular (linear) potential V(x) = eF x for x > 0 with an infinite wall at "
+            "x = 0 arises in semiconductor heterostructures at interfaces where a strong "
+            "electric field confines electrons against a barrier.\n\n"
+            "The Schrodinger equation reduces to the Airy equation, with solutions expressed "
+            "in terms of Airy functions Ai and Bi. Bound state energies are determined by the "
+            "zeros of the Airy function:\n"
+            "  E_n ~ (hbar^2 / 2m)^{1/3} (3 pi eF / 2)^{2/3} (n - 1/4)^{2/3}\n\n"
+            "Key features: (1) energy levels are not equally spaced; (2) wavefunctions are "
+            "oscillatory inside the well and decay exponentially outside; (3) this potential "
+            "is central to understanding 2DEGs at GaAs/AlGaAs interfaces."
+        );
+    }
+
     static double F = 1e10;
     static double energy = 1e-18;
     ImGui::InputDouble("Electric field F (N/C)", &F, 0, 0, "%.3e");
@@ -475,6 +611,21 @@ void GuiApp::renderSim10_Parabolic()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Parabolic Well");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The parabolic well V(x) = (1/2) m omega^2 x^2 is physically identical to the "
+            "quantum harmonic oscillator but is presented here in a semiconductor context. "
+            "Parabolic confinement profiles are engineered in quantum wells by grading the "
+            "alloy composition, producing nearly equally spaced subbands.\n\n"
+            "Energies:  E_n = hbar omega (n + 1/2)\n"
+            "The advantage of parabolic confinement over square wells is that the subband "
+            "spacing is constant, which simplifies intersubband optical transitions.\n\n"
+            "Key features: (1) equally spaced levels regardless of quantum number; "
+            "(2) wavefunctions are Hermite-Gauss functions identical to the free-space HO; "
+            "(3) widely used in modeling quantum dots and modulation-doped heterostructures."
+        );
+    }
 
     static int n = 0;
     static double omega = 1e15;
@@ -511,6 +662,21 @@ void GuiApp::renderSim11_FDM()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Numerical Solver (FDM)");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The finite-difference method (FDM) discretises the 1D Schrodinger equation on a "
+            "uniform grid of N points. The second derivative is approximated by the three-point "
+            "stencil: psi''(x_i) ~ [psi_{i+1} - 2 psi_i + psi_{i-1}] / dx^2. This converts "
+            "the differential eigenvalue problem into a matrix eigenvalue problem H psi = E psi, "
+            "where H is a tridiagonal NxN matrix.\n\n"
+            "Diagonal elements: H_ii = 2/(dx^2) * (hbar^2/2m) + V(x_i)\n"
+            "Off-diagonal:      H_{i,i+1} = H_{i+1,i} = -1/(dx^2) * (hbar^2/2m)\n\n"
+            "Key features: (1) works for any potential V(x); (2) accuracy improves as dx -> 0; "
+            "(3) yields both eigenvalues (energies) and eigenvectors (wavefunctions); "
+            "(4) the lowest eigenvalues converge fastest."
+        );
+    }
 
     static double xMin = -5.0, xMax = 5.0;
     static int numPoints = 500, numEigen = 5;
@@ -587,6 +753,20 @@ void GuiApp::renderSim12_CrankNicolson()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Crank-Nicolson Time Evolution");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The Crank-Nicolson scheme is an implicit, unconditionally stable method for "
+            "propagating the time-dependent Schrodinger equation: i hbar d|psi>/dt = H|psi>. "
+            "It averages the Hamiltonian between the current and next time step:\n"
+            "  (1 + i dt H / 2hbar) psi^{n+1} = (1 - i dt H / 2hbar) psi^{n}\n\n"
+            "This results in a tridiagonal linear system solved at each step. The method is "
+            "unitary (preserves norm) and second-order accurate in both space and time.\n\n"
+            "Key features: (1) norm is conserved exactly, unlike explicit Euler; "
+            "(2) stable for any time step dt (though accuracy requires small dt); "
+            "(3) ideal for visualising wave-packet scattering, tunneling, and dispersion."
+        );
+    }
+
     static double xMin = -5e-9, xMax = 5e-9;
     static int N = 500, steps = 1000, snapEvery = 50;
     static double dt = 1e-17;
@@ -631,6 +811,22 @@ void GuiApp::renderSim13_Scattering()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Scattering Coefficients (R, T)");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "When a plane wave impinges on a localised potential, part of it is reflected (R) "
+            "and part transmitted (T). Probability conservation demands R + T = 1 for a "
+            "one-dimensional system. The coefficients are obtained by matching the wavefunction "
+            "and its derivative at each interface.\n\n"
+            "Potential step:  R = |(k1-k2)/(k1+k2)|^2,  T = 1 - R\n"
+            "Delta potential:  R = 1/(1 + 2hbar^2 E / m alpha^2)\n"
+            "Rectangular barrier (E < V0):  T = [1 + V0^2 sinh^2(kappa a)/(4E(V0-E))]^{-1}\n\n"
+            "Key features: (1) quantum reflection occurs even when the particle has enough "
+            "energy to pass classically; (2) tunneling (T > 0 for E < V0) is a purely quantum "
+            "effect; (3) resonant transmission (T = 1) can occur for barriers when standing "
+            "waves fit inside."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Type", &mode, "Potential Step\0Delta Potential\0Rectangular Barrier\0");
@@ -681,6 +877,21 @@ void GuiApp::renderSim14_KronigPenney()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Kronig-Penney Model");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The Kronig-Penney model is the simplest exactly solvable model of a crystal. "
+            "It consists of a periodic array of rectangular barriers (or delta functions) with "
+            "lattice constant d = a + b. By applying Bloch's theorem, psi(x+d) = e^{iKd} psi(x), "
+            "the allowed energies form bands separated by forbidden gaps.\n\n"
+            "The dispersion relation is:\n"
+            "  cos(Kd) = cos(alpha a) cos(beta b) - (alpha^2+beta^2)/(2 alpha beta) sin(alpha a) sin(beta b)\n"
+            "where alpha, beta are the wave vectors inside and outside the barriers.\n\n"
+            "Key features: (1) energy bands and gaps emerge naturally from periodicity; "
+            "(2) the gap width increases with barrier strength; (3) the delta-function limit "
+            "gives the clean formula cos(Ka) = P sin(z)/z + cos(z) with P = m V0 b a / hbar^2."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("Model", &mode, "Full (finite barriers)\0Delta-barrier limit\0");
 
@@ -730,6 +941,20 @@ void GuiApp::renderSim15_TightBinding()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Tight-Binding Model");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The tight-binding model describes electrons that are mostly localised on atomic "
+            "sites but can hop to neighbouring sites with amplitude t. Starting from isolated "
+            "atomic orbitals of energy E0, the crystal Hamiltonian is H = sum_n E0 |n><n| - "
+            "t (|n><n+1| + |n+1><n|).\n\n"
+            "Dispersion relation (1D):  E(k) = E0 - 2t cos(ka)\n"
+            "Band width = 4t.  Effective mass at band bottom: m* = hbar^2 / (2 t a^2).\n\n"
+            "Key features: (1) a single s-band in 1D spans [E0-2t, E0+2t]; (2) the effective "
+            "mass is inversely proportional to the hopping integral; (3) this model is the "
+            "foundation of electronic-structure methods in solids and molecules (Huckel theory)."
+        );
+    }
+
     static double E0 = 1e-18, t = 1e-19, a = 3e-10;
     ImGui::InputDouble("On-site E0 (J)",  &E0, 0, 0, "%.3e");
     ImGui::InputDouble("Hopping t (J)",   &t,  0, 0, "%.3e");
@@ -767,6 +992,20 @@ void GuiApp::renderSim16_HOFull()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Harmonic Oscillator - Full Analysis");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "This panel combines all aspects of the quantum harmonic oscillator: energy spectrum, "
+            "wavefunctions, ladder operators, uncertainty relations, and the response to an "
+            "external electric field.\n\n"
+            "Ladder operators: a|n> = sqrt(n)|n-1>,  a^dag|n> = sqrt(n+1)|n+1>\n"
+            "Position: x = sqrt(hbar/2m omega)(a + a^dag);  Momentum: p = i sqrt(m hbar omega/2)(a^dag - a)\n"
+            "Uncertainty: Dx Dp = hbar(n + 1/2)/2, with the ground state saturating the bound.\n\n"
+            "In a uniform electric field E, V -> (1/2)m omega^2 x^2 - qEx. Completing the square "
+            "shifts the equilibrium by x0 = qE/(m omega^2) and lowers every level by "
+            "q^2 E^2/(2m omega^2), leaving the spacing unchanged."
+        );
+    }
 
     static int n = 0;
     static double omega = 1e15;
@@ -831,6 +1070,18 @@ void GuiApp::renderSim17_Box2D()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Particle in a 2D Box");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A particle confined to a rectangular region 0 < x < a, 0 < y < b with infinite "
+            "walls. The problem separates into two independent 1D boxes, giving:\n\n"
+            "  E(nx,ny) = (pi^2 hbar^2 / 2m) [nx^2/a^2 + ny^2/b^2],  nx,ny = 1,2,...\n"
+            "  psi(x,y) = (2/sqrt(ab)) sin(nx pi x/a) sin(ny pi y/b)\n\n"
+            "For a square box (a = b) many states are degenerate: e.g. (1,2) and (2,1) share "
+            "the same energy. This 'accidental' degeneracy is a consequence of the C4v symmetry. "
+            "Breaking the symmetry (a != b) lifts the degeneracy."
+        );
+    }
+
     static int nx = 1, ny = 1;
     static double a = 1e-10, b = 0;
     ImGui::InputDouble("Side a (m)", &a, 0, 0, "%.3e");
@@ -865,6 +1116,18 @@ void GuiApp::renderSim18_Box3D()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Particle in a 3D Box");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Generalising to three dimensions, a particle in a rectangular box of sides a, b, c "
+            "has energies:\n\n"
+            "  E(nx,ny,nz) = (pi^2 hbar^2 / 2m) [nx^2/a^2 + ny^2/b^2 + nz^2/c^2]\n\n"
+            "For a cubic box (a = b = c) the degeneracy pattern is richer: the number of states "
+            "at each energy level equals the number of ways to write n^2 = nx^2 + ny^2 + nz^2 "
+            "with positive integers. For example, (1,1,2), (1,2,1), and (2,1,1) are 3-fold "
+            "degenerate. This model is the starting point for the free-electron theory of metals."
+        );
+    }
 
     static int nx = 1, ny = 1, nz = 1;
     static double a = 1e-10, b = 0, c = 0;
@@ -905,6 +1168,20 @@ void GuiApp::renderSim19_QuantumStructures()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Quantum Nanostructures");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "When one or more dimensions of a semiconductor are reduced to the nanoscale, "
+            "quantum confinement discretises the energy spectrum along those directions.\n\n"
+            "Quantum Well (1D confinement): E = E_n + hbar^2(kx^2+ky^2)/(2m*). Subbands form; "
+            "motion is free in the plane.\n"
+            "Quantum Wire (2D confinement): E = E_{ny,nz} + hbar^2 kx^2/(2m*). 1D sub-bands.\n"
+            "Quantum Dot (3D confinement): E = E_{nx,ny,nz}. Fully discrete, atom-like spectrum.\n\n"
+            "Key features: (1) confinement energy scales as 1/L^2; (2) the density of states "
+            "changes qualitatively with dimensionality (step-like for 2D, van-Hove peaks for 1D, "
+            "delta functions for 0D); (3) effective mass m* replaces free electron mass."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Structure", &mode,
@@ -974,6 +1251,21 @@ void GuiApp::renderSim20_CentralPotential()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Central Potential & Spherical Harmonics");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "For any spherically symmetric potential V(r), the Schrodinger equation separates "
+            "in spherical coordinates into a radial equation and an angular equation. The angular "
+            "part is universal and solved by the spherical harmonics Y_l^m(theta, phi).\n\n"
+            "L^2 Y_l^m = hbar^2 l(l+1) Y_l^m,   Lz Y_l^m = hbar m Y_l^m\n"
+            "l = 0,1,2,...  and  m = -l,...,+l  (2l+1 states per l).\n\n"
+            "The effective radial potential is V_eff(r) = V(r) + hbar^2 l(l+1)/(2mr^2), where "
+            "the second term is the centrifugal barrier. Key features: (1) angular momentum "
+            "is quantised in both magnitude and z-projection; (2) the centrifugal term repels "
+            "the particle from the origin for l > 0; (3) Y_l^m form a complete orthonormal set "
+            "on the unit sphere."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("View", &mode,
                  "Spherical harmonics Y_l^m\0Effective potential\0Angular momentum eigenvalues\0");
@@ -1025,6 +1317,21 @@ void GuiApp::renderSim21_SphericalWell()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Spherical Infinite Well");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A particle confined inside a sphere of radius a with V = 0 for r < a and V = inf "
+            "outside. The radial Schrodinger equation for each angular momentum l is solved by "
+            "spherical Bessel functions j_l(kr).\n\n"
+            "Boundary condition j_l(ka) = 0 gives quantised wave vectors k_{nl} = g_{nl}/a, "
+            "where g_{nl} is the n-th zero of j_l. The energies are:\n"
+            "  E_{nl} = hbar^2 g_{nl}^2 / (2 m a^2)\n\n"
+            "Key features: (1) the ordering of levels (1s, 1p, 1d, 2s, ...) differs from "
+            "hydrogen because there is no 1/r potential; (2) this model is used for nuclear "
+            "shell structure and metallic nanoparticles; (3) each level has (2l+1)-fold "
+            "degeneracy from the magnetic quantum number m."
+        );
+    }
+
     static double a = 1e-10;
     static int maxN = 3, maxL = 3;
     static int expN = 1, expL = 0;
@@ -1061,6 +1368,20 @@ void GuiApp::renderSim22_TwoBody()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Two-Body Problem");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "A two-body problem with an interaction V(|r1-r2|) can be separated into "
+            "centre-of-mass motion (free particle of total mass M = m1+m2) and relative motion "
+            "of a single particle with the reduced mass mu = m1*m2/(m1+m2).\n\n"
+            "For the Coulomb interaction this gives E_n = -mu Z^2 e^4 / (2 hbar^2 n^2), which "
+            "differs from the infinite-nucleus result by replacing m_e with mu. For hydrogen "
+            "mu/m_e = 0.99946; for positronium mu = m_e/2; for muonic hydrogen mu ~ 186 m_e.\n\n"
+            "Key features: (1) the reduced-mass correction shifts all energy levels by the "
+            "factor mu/m_e; (2) the Bohr radius scales as a0 * m_e/mu; (3) this separation "
+            "is exact for any central potential."
+        );
+    }
 
     static double m1 = 0, m2 = 0, Z = 1;
     static int maxN = 5;
@@ -1100,6 +1421,20 @@ void GuiApp::renderSim23_OrbitalAM()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Orbital Angular Momentum");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Orbital angular momentum L = r x p is quantised: L^2 has eigenvalues "
+            "hbar^2 l(l+1) and Lz has eigenvalues hbar m with m = -l,...,+l. The ladder "
+            "operators L+/- = Lx +/- i Ly raise or lower m by one unit.\n\n"
+            "L+ |l,m> = hbar sqrt[l(l+1) - m(m+1)] |l,m+1>\n"
+            "L- |l,m> = hbar sqrt[l(l+1) - m(m-1)] |l,m-1>\n\n"
+            "The fundamental commutation relations [Li,Lj] = i hbar epsilon_{ijk} Lk define "
+            "the su(2) Lie algebra. Key features: (1) only L^2 and one component (say Lz) can "
+            "be simultaneously sharp; (2) the ladder operators connect all 2l+1 states within "
+            "a multiplet; (3) these algebraic results apply identically to spin."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("View", &mode,
@@ -1160,6 +1495,19 @@ void GuiApp::renderSim24_SpinHalf()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Spin-1/2 System");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Spin is an intrinsic angular momentum with no classical analogue. For spin-1/2 "
+            "particles (electrons, protons, neutrons) the spin operators are S = (hbar/2) sigma, "
+            "where sigma_x, sigma_y, sigma_z are the 2x2 Pauli matrices.\n\n"
+            "S^2 = (3/4) hbar^2 (always).  Sz eigenvalues: +hbar/2 (spin up) or -hbar/2 (spin down).\n"
+            "A general spinor |chi> = alpha|up> + beta|down> with |alpha|^2 + |beta|^2 = 1.\n\n"
+            "Key features: (1) Pauli matrices satisfy sigma_i sigma_j = delta_{ij} I + "
+            "i epsilon_{ijk} sigma_k; (2) spin-1/2 is the fundamental representation of SU(2); "
+            "(3) a 360-degree rotation changes the sign of the spinor (fermion sign)."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("View", &mode,
@@ -1253,6 +1601,19 @@ void GuiApp::renderSim25_AMAddition()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Addition of Angular Momentum");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "When two angular momenta J1 and J2 are coupled, the total J = J1 + J2 takes values "
+            "|j1-j2|, |j1-j2|+1, ..., j1+j2. The transformation between the uncoupled basis "
+            "|j1,m1>|j2,m2> and the coupled basis |J,M> is given by Clebsch-Gordan coefficients.\n\n"
+            "|J,M> = sum_{m1,m2} <j1,m1;j2,m2|J,M> |j1,m1>|j2,m2>\n\n"
+            "For two spin-1/2 particles: J = 0 (singlet, antisymmetric) or J = 1 (triplet, "
+            "symmetric). Key features: (1) the total number of states is conserved: "
+            "(2j1+1)(2j2+1) = sum_J (2J+1); (2) M = m1+m2 is always conserved; (3) Clebsch-Gordan "
+            "coefficients are real and satisfy orthogonality relations."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("View", &mode,
                  "General J1+J2 (Clebsch-Gordan)\0Two spin-1/2 (singlet/triplet)\0");
@@ -1314,6 +1675,19 @@ void GuiApp::renderSim26_NonDegPT()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Non-Degenerate Perturbation Theory");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "When the Hamiltonian is H = H0 + lambda H', and the unperturbed states are "
+            "non-degenerate, the energy corrections are obtained order by order:\n\n"
+            "First order:  E_n^(1) = <n|H'|n>\n"
+            "Second order: E_n^(2) = sum_{m!=n} |<m|H'|n>|^2 / (E_n^(0) - E_m^(0))\n\n"
+            "The Stark effect (atom in a uniform electric field H' = -qEx) is the classic "
+            "application. For the infinite square well E^(1) = 0 by parity and the second-order "
+            "shift is negative (the atom polarises). For the harmonic oscillator the second-order "
+            "shift is -q^2 E^2/(2m omega^2), independent of n."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("System", &mode,
@@ -1392,6 +1766,20 @@ void GuiApp::renderSim27_DegPT()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Degenerate Perturbation Theory");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "When unperturbed states are degenerate (E_n^(0) = E_m^(0)), the standard "
+            "perturbation series diverges because of vanishing denominators. The remedy is to "
+            "diagonalise the perturbation H' within the degenerate subspace first.\n\n"
+            "Procedure: (1) identify the d-fold degenerate subspace; (2) form the d x d matrix "
+            "W_{ij} = <n,i|H'|n,j>; (3) diagonalise W to find the first-order energy corrections "
+            "and the 'good' zeroth-order states.\n\n"
+            "Key features: (1) the 'good' states are those that diagonalise H' within the "
+            "degenerate subspace; (2) the linear Stark effect in hydrogen (n >= 2) is the "
+            "textbook example; (3) for a 2x2 case the splitting is simply 2|W12|."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("View", &mode,
                  "Formalism\0Degenerate two-level\0General 2x2 matrix\0");
@@ -1455,6 +1843,20 @@ void GuiApp::renderSim28_IdenticalParticles()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Identical Particles");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Identical quantum particles are truly indistinguishable. Under particle exchange "
+            "the wavefunction must be symmetric (bosons) or antisymmetric (fermions).\n\n"
+            "For two fermions in a box: psi_-(x1,x2) = [phi_a(x1)phi_b(x2) - phi_b(x1)phi_a(x2)]/sqrt(2). "
+            "This vanishes when a = b (Pauli exclusion principle).\n\n"
+            "For N fermions the fully antisymmetric wavefunction is the Slater determinant. The "
+            "free-electron model fills box states with two electrons each (spin up/down) up to the "
+            "Fermi level. Key features: (1) exchange symmetry has no classical counterpart; "
+            "(2) the Pauli principle explains the periodic table and the stability of matter; "
+            "(3) the exchange force is a purely quantum geometric effect, not a real force."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("View", &mode,
@@ -1556,6 +1958,20 @@ void GuiApp::renderSim29_Helium()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Helium Atom & Variational Method");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Helium (Z = 2, two electrons) is the simplest atom that cannot be solved exactly "
+            "because of electron-electron repulsion e^2/(4 pi epsilon_0 |r1-r2|).\n\n"
+            "Perturbation theory: treat e-e repulsion as H'. E^(0) = -108.8 eV (two independent "
+            "hydrogen-like electrons). First-order correction E^(1) = +(5/4)(Z)(13.6 eV) = +34 eV, "
+            "giving E ~ -74.8 eV vs experimental -79.0 eV.\n\n"
+            "Variational method: use trial wavefunction psi ~ e^{-lambda r1/a0} e^{-lambda r2/a0} "
+            "and minimise <H> with respect to lambda. The optimal lambda = Z - 5/16 = 27/16 gives "
+            "E = -77.5 eV, much closer to experiment. The parameter lambda represents screening "
+            "of the nuclear charge by the other electron."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("View", &mode,
                  "Perturbation theory\0Para- & Orthohelium\0Variational method\0");
@@ -1630,6 +2046,20 @@ void GuiApp::renderSim30_WKB()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "WKB Approximation");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The WKB (Wentzel-Kramers-Brillouin) approximation is a semiclassical method valid "
+            "when the potential varies slowly on the scale of the de Broglie wavelength. The "
+            "wavefunction is approximated as psi ~ A(x)/sqrt(p(x)) exp(+/- i/hbar integral p dx).\n\n"
+            "Bohr-Sommerfeld quantisation: integral_{x1}^{x2} p(x) dx = (n + 1/2) pi hbar\n"
+            "where x1, x2 are the classical turning points and p(x) = sqrt(2m(E-V(x))).\n\n"
+            "For tunneling through a barrier: T ~ exp(-2/hbar integral_{x1}^{x2} |p(x)| dx).\n\n"
+            "Key features: (1) WKB is exact for the harmonic oscillator; (2) it becomes more "
+            "accurate at large quantum numbers; (3) it breaks down at the turning points, where "
+            "connection formulas involving Airy functions are needed."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Application", &mode,
@@ -1739,6 +2169,22 @@ void GuiApp::renderSim31_TimeDependentPT()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Time-Dependent Perturbation Theory");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Time-dependent perturbation theory treats a system whose Hamiltonian is H = H0 + V(t), "
+            "where V(t) is switched on at t=0. To first order the transition probability from "
+            "state |i> to |f> is P_{i->f}(t) = |V_fi|^2/hbar^2 * sin^2((omega_0 - omega)t/2) / "
+            "((omega_0 - omega)/2)^2, peaking sharply at resonance omega = omega_0.\n\n"
+            "Fermi's golden rule gives the transition rate for long times: "
+            "Gamma = (2pi/hbar)|V_fi|^2 rho(E_f), where rho is the density of final states. "
+            "This is the foundation of decay rates, absorption, and emission in quantum mechanics.\n\n"
+            "Rabi oscillations occur in a two-level system driven near resonance. The population "
+            "oscillates at the generalised Rabi frequency Omega_R' = sqrt(Omega_R^2 + delta^2), "
+            "where delta is the detuning and Omega_R = |V_fi|/hbar is the on-resonance Rabi frequency. "
+            "At exact resonance the system undergoes complete population inversion periodically."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("View", &mode,
                  "Transition probability\0Fermi's golden rule\0Rabi oscillations\0");
@@ -1835,6 +2281,20 @@ void GuiApp::renderSim32_FullHydrogen()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Full Hydrogen Atom");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The full hydrogen atom solution separates into radial and angular parts: "
+            "psi_nlm(r,theta,phi) = R_nl(r) * Y_l^m(theta,phi). The radial wavefunction is "
+            "R_nl(r) = N * (2r/na0)^l * exp(-r/na0) * L_{n-l-1}^{2l+1}(2r/na0), where "
+            "L_p^k are associated Laguerre polynomials and a0 = hbar^2/(me*e^2) is the Bohr radius.\n\n"
+            "Quantum numbers: n = 1,2,3,... (principal), l = 0,...,n-1 (orbital angular momentum), "
+            "m = -l,...,+l (magnetic). Energies depend only on n: E_n = -13.6 eV * Z^2/n^2.\n\n"
+            "Analytical expectation values: <r> = (a0/2Z)(3n^2 - l(l+1)), "
+            "<1/r> = Z/(n^2 a0), <1/r^2> = Z^2/(n^3(l+1/2)a0^2). The radial probability density "
+            "r^2|R_nl|^2 shows (n-l-1) nodes and a most probable radius that increases with n."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("View", &mode,
                  "Radial wavefunction R_nl\0Probability density |psi|^2\0Expectation values\0");
@@ -1908,6 +2368,23 @@ void GuiApp::renderSim33_FineStructure()
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Fine Structure of Hydrogen");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Fine structure lifts the degeneracy within each hydrogen energy level through three "
+            "relativistic corrections of order alpha^2 E_n (where alpha ~ 1/137 is the fine-structure "
+            "constant):\n\n"
+            "1) Relativistic kinetic energy: the correction to the kinetic energy from the expansion "
+            "of the relativistic energy-momentum relation. Always negative (reduces energy).\n\n"
+            "2) Spin-orbit coupling: the interaction between the electron's magnetic moment and the "
+            "magnetic field seen in its rest frame due to the orbiting nucleus. Splits levels by j = l +/- 1/2.\n\n"
+            "3) Darwin term: a contact interaction affecting only l=0 states, arising from the "
+            "Zitterbewegung (trembling motion) of the electron.\n\n"
+            "Combined result: E_fs = E_n [1 + (alpha*Z)^2/n * (1/(j+1/2) - 3/(4n))]. "
+            "States with the same j but different l remain degenerate at this level. "
+            "The Lamb shift (~1057 MHz for n=2) further breaks this degeneracy via QED effects."
+        );
+    }
+
     static int n = 2;
     static double Z = 1.0;
     ImGui::InputInt("n", &n); if (n < 1) n = 1;
@@ -1958,6 +2435,20 @@ void GuiApp::renderSim34_Zeeman()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Zeeman Effect");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The Zeeman effect describes the splitting of atomic energy levels in an external "
+            "magnetic field B. The perturbation is H' = -(e/2m)(L + 2S) . B = -mu_B (L + 2S) . B/hbar.\n\n"
+            "Weak field (anomalous Zeeman): When B is much smaller than the internal spin-orbit field, "
+            "J = L + S remains a good quantum number. The splitting is E_Z = g_J * mu_B * m_j * B, "
+            "where g_J = 1 + [j(j+1) + s(s+1) - l(l+1)] / [2j(j+1)] is the Lande g-factor. "
+            "Different g_J values for different j levels produce unequally spaced lines (hence 'anomalous').\n\n"
+            "Strong field (Paschen-Back): When B dominates over spin-orbit coupling, L and S decouple "
+            "and precess independently about B. The energy is E = E_Bohr + mu_B * B * (m_l + 2*m_s). "
+            "The transition between regimes is a classic example of competing perturbations."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Regime", &mode,
@@ -2031,6 +2522,23 @@ void GuiApp::renderSim35_PartialWaves()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Partial Wave Analysis");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Partial wave analysis expands the scattering wavefunction in angular momentum eigenstates. "
+            "For a spherically symmetric potential, the scattering amplitude decomposes as "
+            "f(theta) = (1/k) sum_l (2l+1) exp(i delta_l) sin(delta_l) P_l(cos theta), "
+            "where delta_l is the phase shift for the l-th partial wave.\n\n"
+            "The phase shifts encode all scattering information: the total cross section is "
+            "sigma = (4pi/k^2) sum_l (2l+1) sin^2(delta_l), and the differential cross section is "
+            "dsigma/dOmega = |f(theta)|^2. Only partial waves with l < ka contribute significantly "
+            "(where a is the potential range), since higher-l waves have centrifugal barriers.\n\n"
+            "For a hard sphere, delta_l is determined by the spherical Bessel zeros. For a finite well, "
+            "matching interior and exterior wavefunctions at r = a gives delta_l. Resonances occur "
+            "when delta_l passes through pi/2, producing sharp peaks in the cross section (analogous "
+            "to Breit-Wigner resonances)."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("View", &mode,
@@ -2121,6 +2629,22 @@ void GuiApp::renderSim36_BornApprox()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Born Approximation");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The Born approximation treats the scattering potential as a perturbation to the "
+            "free-particle Hamiltonian. The first-order scattering amplitude is "
+            "f(theta) = -(m/2pi hbar^2) integral V(r') exp(i q.r') d^3r', where q = k_f - k_i "
+            "is the momentum transfer with |q| = 2k sin(theta/2).\n\n"
+            "For a spherically symmetric potential, this reduces to "
+            "f(theta) = -(2m/hbar^2 q) integral_0^inf r' V(r') sin(qr') dr'. The Born approximation "
+            "is valid when the potential is weak (V << E) or the energy is high (ka >> 1).\n\n"
+            "Key results: (1) Spherical well: f ~ (sin(qa) - qa cos(qa))/q^3; "
+            "(2) Yukawa V = -V0 exp(-mu r)/(mu r): f ~ 1/(q^2 + mu^2), recovering the Coulomb result "
+            "as mu -> 0 (Rutherford scattering); (3) Born series: higher-order terms give systematic "
+            "corrections when the first Born approximation breaks down."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("View", &mode,
@@ -2255,6 +2779,22 @@ void GuiApp::renderSim37_TransferMatrix()
     ImGui::Text("37 · Transfer Matrix Method");
     ImGui::Separator();
 
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The transfer matrix method solves 1D scattering through arbitrary piecewise-constant "
+            "potentials by propagating the wavefunction coefficients from one region to the next. "
+            "For each layer of width d and wave vector k', the 2x2 transfer matrix relates the "
+            "(A,B) coefficients on the left to those on the right via continuity of psi and psi'.\n\n"
+            "The total transfer matrix is the ordered product M = M_N ... M_2 M_1. The transmission "
+            "and reflection coefficients are T = |1/M_11|^2 * k_out/k_in and R = |M_21/M_11|^2, "
+            "satisfying T + R = 1.\n\n"
+            "Resonant tunneling through a double barrier is a striking application: transmission "
+            "reaches T = 1 at certain energies corresponding to quasi-bound states in the well "
+            "between barriers. These resonances have a Breit-Wigner (Lorentzian) shape and are the "
+            "basis of resonant tunneling diodes (RTDs) used in high-frequency electronics."
+        );
+    }
+
     static int mode = 0;
     ImGui::Combo("Mode", &mode,
         "Resonant Tunneling (Double Barrier)\0Custom Multilayer\0");
@@ -2353,6 +2893,21 @@ void GuiApp::renderSim38_DensityOfStates()
 {
     ImGui::Text("38 \xc2\xb7 Density of States");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "The density of states g(E) counts the number of quantum states per unit energy interval. "
+            "It determines thermodynamic properties, optical absorption, and transport.\n\n"
+            "Free particles: g(E) depends on dimensionality. In 1D: g ~ 1/sqrt(E) (van Hove singularity "
+            "at band edge). In 2D: g = m/(pi hbar^2) = constant per subband. In 3D: g ~ sqrt(E) "
+            "(the classic result for metals).\n\n"
+            "Confinement modifies the DOS dramatically: a 1D box produces discrete delta-function peaks "
+            "(broadened by scattering in practice). A quantum well creates a staircase DOS where each "
+            "step corresponds to a new subband becoming available. The step height equals the 2D free-particle "
+            "DOS. These quantised features are directly observable in optical absorption and tunneling "
+            "spectroscopy of semiconductor nanostructures."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Mode", &mode,
@@ -2459,6 +3014,22 @@ void GuiApp::renderSim39_CoherentSqueezed()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Coherent & Squeezed States");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Coherent states |alpha> are eigenstates of the annihilation operator: a|alpha> = alpha|alpha>. "
+            "They are the quantum states closest to classical behaviour — the expectation values <x>(t) "
+            "and <p>(t) follow classical trajectories, and the uncertainties remain at the minimum "
+            "uncertainty product Dx*Dp = hbar/2 for all time.\n\n"
+            "The photon number distribution is Poissonian: P(n) = exp(-|alpha|^2) |alpha|^{2n}/n!, "
+            "with mean <n> = |alpha|^2 and variance equal to the mean. The Wigner function W(x,p) is a "
+            "Gaussian centred at the classical phase-space point.\n\n"
+            "Squeezed states reduce the uncertainty in one quadrature below the vacuum level at the "
+            "expense of increasing it in the conjugate quadrature: Dx = Dx_0 e^{-r}, Dp = Dp_0 e^{+r}, "
+            "where r is the squeeze parameter. The product Dx*Dp = hbar/2 is preserved. Squeezed light "
+            "is crucial for gravitational wave detection (LIGO) and quantum-enhanced metrology."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Mode", &mode,
@@ -2605,6 +3176,23 @@ void GuiApp::renderSim40_Entanglement()
 {
     ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Quantum Entanglement & Bell States");
     ImGui::Separator();
+
+    if (ImGui::CollapsingHeader("Theory")) {
+        ImGui::TextWrapped(
+            "Quantum entanglement describes correlations between particles that cannot be explained by "
+            "classical physics. A two-qubit state |psi> is entangled if it cannot be written as a product "
+            "|a>|b>. The four Bell states form a maximally entangled basis: "
+            "|Phi+-> = (|00> +/- |11>)/sqrt(2), |Psi+-> = (|01> +/- |10>)/sqrt(2).\n\n"
+            "Entanglement is quantified by the concurrence C (0 = separable, 1 = maximally entangled) "
+            "and the von Neumann entropy S = -Tr(rho_A ln rho_A) of the reduced density matrix. "
+            "For Bell states: C = 1 and S = ln(2).\n\n"
+            "The CHSH inequality tests local hidden variable theories: S = E(a,b) - E(a,b') + E(a',b) + E(a',b') "
+            "satisfies |S| <= 2 classically. Quantum mechanics allows |S| up to 2*sqrt(2) ~ 2.83 "
+            "(Tsirelson's bound). Bell states achieve this maximum, violating the classical bound and "
+            "confirming quantum nonlocality. This is the foundation of quantum key distribution and "
+            "quantum teleportation protocols."
+        );
+    }
 
     static int mode = 0;
     ImGui::Combo("Mode", &mode,
