@@ -412,6 +412,47 @@ public:
     void exportWignerCSV(const std::string& filename,
         double alpha_r, double alpha_i, double omega, int numX, int numP);
 
+    // ===== 40: Quantum Entanglement & Bell States =====
+    // 4-component state vector for two-qubit system: |00>, |01>, |10>, |11>
+    using TwoQubitState = std::array<std::complex<double>, 4>;
+
+    // Standard Bell states
+    static TwoQubitState bellStatePhi(bool plus);   // |Phi+-> = (|00> +/- |11>)/sqrt(2)
+    static TwoQubitState bellStatePsi(bool plus);   // |Psi+-> = (|01> +/- |10>)/sqrt(2)
+
+    // 4x4 density matrix from state vector: rho = |psi><psi|
+    using DensityMatrix4 = std::array<std::array<std::complex<double>, 4>, 4>;
+    static DensityMatrix4 densityMatrixFromState(const TwoQubitState& psi);
+
+    // Partial trace over qubit B -> 2x2 reduced density matrix for A
+    static SpinMatrix partialTraceB(const DensityMatrix4& rho);
+    // Partial trace over qubit A -> 2x2 reduced density matrix for B
+    static SpinMatrix partialTraceA(const DensityMatrix4& rho);
+
+    // Von Neumann entropy S = -Tr(rho * ln(rho)) for a 2x2 density matrix
+    static double vonNeumannEntropy2x2(const SpinMatrix& rho);
+
+    // Concurrence C for a two-qubit pure state
+    static double concurrence(const TwoQubitState& psi);
+
+    // CHSH correlator E(a,b) = <psi| (sigma_a x sigma_b) |psi>
+    // where a,b are measurement angles (in the xz plane)
+    static double chshCorrelator(const TwoQubitState& psi,
+        double thetaA, double thetaB);
+
+    // Full CHSH S parameter: S = E(a,b) - E(a,b') + E(a',b) + E(a',b')
+    static double chshS(const TwoQubitState& psi,
+        double thetaA, double thetaAp, double thetaB, double thetaBp);
+
+    // Measurement probability: P(outcome_A, outcome_B | axis_A, axis_B)
+    // outcomes: +1 or -1; axes: angles in xz plane
+    static double measurementProb(const TwoQubitState& psi,
+        int outcomeA, int outcomeB, double thetaA, double thetaB);
+
+    void exportBellStateAnalysisCSV(const std::string& filename);
+    void exportCHSHSweepCSV(const std::string& filename,
+        const TwoQubitState& psi, int numAngles);
+
 };
 
 

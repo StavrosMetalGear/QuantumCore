@@ -73,4 +73,10 @@ private:
     void renderSim32_FullHydrogen();
     void renderSim33_FineStructure();
     void renderSim34_Zeeman();
+    void renderSim35_PartialWaves();
+    void renderSim36_BornApprox();
+    void renderSim37_TransferMatrix();
+    void renderSim38_DensityOfStates();
+    void renderSim39_CoherentSqueezed();
+    void renderSim40_Entanglement();
 };

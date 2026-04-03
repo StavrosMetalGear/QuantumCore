@@ -2420,3 +2420,817 @@ void QuantumParticle::exportZeemanCSV(const std::string& filename, int n, double
     }
     out.close();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  35: PARTIAL WAVE ANALYSIS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Spherical Neumann function n_l(x) via recurrence
+double QuantumParticle::sphericalNeumannN(int l, double x) {
+    if (fabs(x) < 1e-15) {
+        return -1e30; // diverges at origin
+    }
+    // n_0(x) = -cos(x)/x
+    double n0 = -cos(x) / x;
+    if (l == 0) return n0;
+
+    // n_1(x) = -cos(x)/x^2 - sin(x)/x
+    double n1 = -cos(x) / (x * x) - sin(x) / x;
+    if (l == 1) return n1;
+
+    // Recurrence: n_{l+1}(x) = (2l+1)/x * n_l(x) - n_{l-1}(x)
+    double nlm1 = n0;
+    double nl = n1;
+    for (int ll = 1; ll < l; ++ll) {
+        double nlp1 = (2.0 * ll + 1.0) / x * nl - nlm1;
+        nlm1 = nl;
+        nl = nlp1;
+    }
+    return nl;
+}
+
+// Phase shift for hard sphere: tan(delta_l) = j_l(ka) / n_l(ka)
+double QuantumParticle::phaseShiftHardSphere(int l, double k, double a) {
+    double ka = k * a;
+    if (ka < 1e-30) return 0.0;
+    double jl = sphericalBesselJ(l, ka);
+    double nl = sphericalNeumannN(l, ka);
+    return atan2(jl, nl);
+}
+
+// Phase shift for finite spherical well of depth V0
+double QuantumParticle::phaseShiftFiniteWell(int l, double E, double V0, double a) {
+    const double hbar = 1.0545718e-34;
+    if (E <= 0.0) return 0.0;
+
+    double k = sqrt(2.0 * mass * E) / hbar;
+    double K = sqrt(2.0 * mass * (E + V0)) / hbar;
+
+    double ka = k * a;
+    double Ka = K * a;
+
+    if (ka < 1e-30) return 0.0;
+
+    // Matching logarithmic derivatives at r = a:
+    // tan(delta_l) = [k*j_l'(ka)*j_l(Ka) - K*j_l(ka)*j_l'(Ka)]
+    //              / [k*n_l'(ka)*j_l(Ka) - K*n_l(ka)*j_l'(Ka)]
+    // Use numerical derivatives: f'(x) ~ [f(x+h) - f(x-h)]/(2h)
+    double h = 1e-6;
+
+    double jl_ka  = sphericalBesselJ(l, ka);
+    double nl_ka  = sphericalNeumannN(l, ka);
+    double jl_Ka  = sphericalBesselJ(l, Ka);
+
+    double djl_ka = (sphericalBesselJ(l, ka + h) - sphericalBesselJ(l, ka - h)) / (2.0 * h);
+    double dnl_ka = (sphericalNeumannN(l, ka + h) - sphericalNeumannN(l, ka - h)) / (2.0 * h);
+    double djl_Ka = (sphericalBesselJ(l, Ka + h) - sphericalBesselJ(l, Ka - h)) / (2.0 * h);
+
+    double num = k * djl_ka * jl_Ka - K * jl_ka * djl_Ka;
+    double den = k * dnl_ka * jl_Ka - K * nl_ka * djl_Ka;
+
+    if (fabs(den) < 1e-50) return M_PI / 2.0;
+    return atan2(num, den);
+}
+
+// sigma_l = (4pi/k^2)(2l+1)sin^2(delta_l)
+double QuantumParticle::partialWaveCrossSection(int l, double k, double delta_l) {
+    if (k < 1e-30) return 0.0;
+    double sd = sin(delta_l);
+    return 4.0 * M_PI / (k * k) * (2.0 * l + 1.0) * sd * sd;
+}
+
+// Total cross section: sum of partial waves
+double QuantumParticle::totalCrossSection(double E, double V0, double a, int lMax) {
+    const double hbar = 1.0545718e-34;
+    if (E <= 0.0) return 0.0;
+    double k = sqrt(2.0 * mass * E) / hbar;
+
+    double sigma = 0.0;
+    for (int l = 0; l <= lMax; ++l) {
+        double delta = phaseShiftFiniteWell(l, E, V0, a);
+        sigma += partialWaveCrossSection(l, k, delta);
+    }
+    return sigma;
+}
+
+// Differential cross section dsigma/dOmega
+double QuantumParticle::differentialCrossSection(double E, double V0, double a, int lMax, double theta) {
+    const double hbar = 1.0545718e-34;
+    if (E <= 0.0) return 0.0;
+    double k = sqrt(2.0 * mass * E) / hbar;
+    double cosTheta = cos(theta);
+
+    // f(theta) = (1/k) sum_l (2l+1) exp(i*delta_l) sin(delta_l) P_l(cos theta)
+    std::complex<double> f(0.0, 0.0);
+    for (int l = 0; l <= lMax; ++l) {
+        double delta = phaseShiftFiniteWell(l, E, V0, a);
+        double Pl = associatedLegendre(l, 0, cosTheta);
+        std::complex<double> phase = std::exp(std::complex<double>(0, delta));
+        f += (2.0 * l + 1.0) * phase * sin(delta) * Pl;
+    }
+    f /= k;
+
+    return std::norm(f); // |f(theta)|^2
+}
+
+void QuantumParticle::exportPartialWaveCSV(const std::string& filename,
+    double V0, double a, int lMax, double Emax, int numE)
+{
+    const double hbar = 1.0545718e-34;
+    std::ofstream out(filename);
+    out << "E,k,sigma_total";
+    for (int l = 0; l <= lMax; ++l)
+        out << ",delta_" << l << ",sigma_" << l;
+    out << "\n";
+
+    for (int i = 1; i <= numE; ++i) {
+        double E = Emax * i / numE;
+        double k = sqrt(2.0 * mass * E) / hbar;
+        double sigmaTotal = 0.0;
+
+        std::vector<double> deltas(lMax + 1), sigmas(lMax + 1);
+        for (int l = 0; l <= lMax; ++l) {
+            deltas[l] = phaseShiftFiniteWell(l, E, V0, a);
+            sigmas[l] = partialWaveCrossSection(l, k, deltas[l]);
+            sigmaTotal += sigmas[l];
+        }
+
+        out << E << "," << k << "," << sigmaTotal;
+        for (int l = 0; l <= lMax; ++l)
+            out << "," << deltas[l] << "," << sigmas[l];
+        out << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportDifferentialCSV(const std::string& filename,
+    double E, double V0, double a, int lMax, int numTheta)
+{
+    std::ofstream out(filename);
+    out << "theta,dsigma_dOmega\n";
+    for (int i = 0; i <= numTheta; ++i) {
+        double theta = M_PI * i / numTheta;
+        double ds = differentialCrossSection(E, V0, a, lMax, theta);
+        out << theta << "," << ds << "\n";
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  36: BORN APPROXIMATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// First Born amplitude for a finite spherical well V(r) = -V0 for r<a
+// f(q) = (2m V0 / (hbar^2 q^3)) [sin(qa) - qa cos(qa)]
+// where q = 2k sin(theta/2) is the momentum transfer
+double QuantumParticle::bornAmplitudeSphericalWell(double q, double V0, double a, double m) {
+    const double hbar = 1.0545718e-34;
+    if (q < 1e-30) {
+        // q->0 limit: f = (2m V0 a^3) / (3 hbar^2)
+        return 2.0 * m * V0 * a * a * a / (3.0 * hbar * hbar);
+    }
+    double qa = q * a;
+    return (2.0 * m * V0 / (hbar * hbar * q * q * q)) * (sin(qa) - qa * cos(qa));
+}
+
+// Born amplitude for Yukawa potential V(r) = -V0 exp(-mu r) / (mu r)
+// f(q) = 2m V0 / (hbar^2 mu (q^2 + mu^2))
+double QuantumParticle::bornAmplitudeYukawa(double q, double V0, double mu, double m) {
+    const double hbar = 1.0545718e-34;
+    return 2.0 * m * V0 / (hbar * hbar * mu * (q * q + mu * mu));
+}
+
+// Screened Coulomb: f(q) = -2m Z e^2 / (hbar^2 (q^2 + mu^2))
+double QuantumParticle::bornAmplitudeCoulomb(double q, double Z, double m, double screening) {
+    const double hbar = 1.0545718e-34;
+    const double e = 1.602176634e-19;
+    const double epsilon0 = 8.854187817e-12;
+    double ke2 = e * e / (4.0 * M_PI * epsilon0);
+    return -2.0 * m * Z * ke2 / (hbar * hbar * (q * q + screening * screening));
+}
+
+// Total Born cross section for spherical well (analytic integration)
+// sigma = (4pi m^2 V0^2 / (hbar^4 k^4)) * [2(ka)^2 - sin(2ka)*2ka - cos(2ka) + 1] ...
+// Simplified: integrate |f(q)|^2 over solid angle
+double QuantumParticle::bornTotalCrossSectionSphericalWell(double k, double V0, double a, double m) {
+    const double hbar = 1.0545718e-34;
+    if (k < 1e-30) return 0.0;
+
+    // Numerical integration over theta: sigma = 2pi integral_0^pi |f(q)|^2 sin(theta) dtheta
+    int N = 500;
+    double dtheta = M_PI / N;
+    double sum = 0.0;
+    for (int i = 0; i <= N; ++i) {
+        double theta = i * dtheta;
+        double q = 2.0 * k * sin(theta / 2.0);
+        double f = bornAmplitudeSphericalWell(q, V0, a, m);
+        double w = (i == 0 || i == N) ? 0.5 : 1.0;
+        sum += w * f * f * sin(theta) * dtheta;
+    }
+    return 2.0 * M_PI * sum;
+}
+
+void QuantumParticle::exportBornDifferentialCSV(const std::string& filename,
+    double E, double V0, double a, int numTheta)
+{
+    const double hbar = 1.0545718e-34;
+    std::ofstream out(filename);
+    out << "theta,q,f_born,dsigma_born\n";
+
+    if (E <= 0.0) { out.close(); return; }
+    double k = sqrt(2.0 * mass * E) / hbar;
+
+    for (int i = 0; i <= numTheta; ++i) {
+        double theta = M_PI * i / numTheta;
+        double q = 2.0 * k * sin(theta / 2.0);
+        double f = bornAmplitudeSphericalWell(q, V0, a, mass);
+        out << theta << "," << q << "," << f << "," << f * f << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportBornVsExactCSV(const std::string& filename,
+    double V0, double a, int lMax, double Emax, int numE)
+{
+    const double hbar = 1.0545718e-34;
+    std::ofstream out(filename);
+    out << "E,sigma_born,sigma_exact\n";
+
+    for (int i = 1; i <= numE; ++i) {
+        double E = Emax * i / numE;
+        double k = sqrt(2.0 * mass * E) / hbar;
+        double sigBorn = bornTotalCrossSectionSphericalWell(k, V0, a, mass);
+        double sigExact = totalCrossSection(E, V0, a, lMax);
+        out << E << "," << sigBorn << "," << sigExact << "\n";
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  37: TRANSFER MATRIX METHOD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+void QuantumParticle::transferMatrixLayer(double k, double kp, double width,
+    double M[2][2])
+{
+    // Transfer matrix for a single rectangular layer of wave-vector kp and width d
+    // sandwiched between regions with wave-vector k.
+    //
+    // For a layer with wave-vector kp and width d, the transfer matrix is:
+    //   M = [[cos(kp*d) , -sin(kp*d)/kp],
+    //        [kp*sin(kp*d), cos(kp*d)   ]]
+    //
+    // We use the convention that matches boundary conditions for
+    // the full multilayer product.
+
+    if (fabs(kp) < 1e-30) {
+        // Zero wave-vector: free propagation
+        M[0][0] = 1.0;
+        M[0][1] = width;
+        M[1][0] = 0.0;
+        M[1][1] = 1.0;
+        return;
+    }
+
+    double c = cos(kp * width);
+    double s = sin(kp * width);
+
+    M[0][0] = c;
+    M[0][1] = s / kp;
+    M[1][0] = -kp * s;
+    M[1][1] = c;
+}
+
+QuantumParticle::TransferMatrixResult
+QuantumParticle::transferMatrixMultilayer(
+    double E,
+    const std::vector<double>& widths,
+    const std::vector<double>& heights)
+{
+    const double hbar = 1.0545718e-34;
+    TransferMatrixResult result = { 0.0, 1.0 };
+
+    if (E <= 0.0) return result;
+
+    int N = (int)widths.size();
+    double m = mass;
+
+    // Wave-vector in the free region (V = 0)
+    double k0 = sqrt(2.0 * m * E) / hbar;
+
+    // Total transfer matrix = product of layer matrices
+    // Mtot = M_N * M_{N-1} * ... * M_1
+    double Mtot[2][2] = { {1.0, 0.0}, {0.0, 1.0} }; // identity
+
+    for (int i = 0; i < N; ++i) {
+        double kp;
+        if (E > heights[i]) {
+            kp = sqrt(2.0 * m * (E - heights[i])) / hbar;
+        } else {
+            // Evanescent: use imaginary k represented as real kappa
+            // We handle this by using the hyperbolic form
+            double kappa = sqrt(2.0 * m * (heights[i] - E)) / hbar;
+            // For evanescent waves: cos(i*kappa*d) = cosh(kappa*d)
+            //                       sin(i*kappa*d)/i*kappa = sinh(kappa*d)/kappa
+            double ch = cosh(kappa * widths[i]);
+            double sh = sinh(kappa * widths[i]);
+            double Ml[2][2];
+            Ml[0][0] = ch;
+            Ml[0][1] = sh / kappa;
+            Ml[1][0] = kappa * sh;
+            Ml[1][1] = ch;
+
+            // Multiply: Mtot = Ml * Mtot
+            double tmp[2][2];
+            tmp[0][0] = Ml[0][0] * Mtot[0][0] + Ml[0][1] * Mtot[1][0];
+            tmp[0][1] = Ml[0][0] * Mtot[0][1] + Ml[0][1] * Mtot[1][1];
+            tmp[1][0] = Ml[1][0] * Mtot[0][0] + Ml[1][1] * Mtot[1][0];
+            tmp[1][1] = Ml[1][0] * Mtot[0][1] + Ml[1][1] * Mtot[1][1];
+            for (int r = 0; r < 2; ++r)
+                for (int c = 0; c < 2; ++c)
+                    Mtot[r][c] = tmp[r][c];
+            continue;
+        }
+
+        double Ml[2][2];
+        transferMatrixLayer(k0, kp, widths[i], Ml);
+
+        // Multiply: Mtot = Ml * Mtot
+        double tmp[2][2];
+        tmp[0][0] = Ml[0][0] * Mtot[0][0] + Ml[0][1] * Mtot[1][0];
+        tmp[0][1] = Ml[0][0] * Mtot[0][1] + Ml[0][1] * Mtot[1][1];
+        tmp[1][0] = Ml[1][0] * Mtot[0][0] + Ml[1][1] * Mtot[1][0];
+        tmp[1][1] = Ml[1][0] * Mtot[0][1] + Ml[1][1] * Mtot[1][1];
+        for (int r = 0; r < 2; ++r)
+            for (int c = 0; c < 2; ++c)
+                Mtot[r][c] = tmp[r][c];
+    }
+
+    // Transmission coefficient:
+    // T = 1 / |M11 + M22 + i*(k0*M12 - M21/k0)|^2 * 4
+    // Using the relation: T = 4k0^2 / |k0*M11 + M21 + i*(k0*M12*k0 + M22*k0) ... |
+    // Simpler: for the standard transfer matrix,
+    // T = 4 / ( (M11 + M22)^2 + (k0*M12 - M21/k0)^2 )
+    double A = Mtot[0][0] + Mtot[1][1];
+    double B = k0 * Mtot[0][1] - Mtot[1][0] / k0;
+    double T = 4.0 / (A * A + B * B);
+    if (T > 1.0) T = 1.0;
+    if (T < 0.0) T = 0.0;
+    double R = 1.0 - T;
+
+    result.T = T;
+    result.R = R;
+    return result;
+}
+
+QuantumParticle::TransferMatrixResult
+QuantumParticle::resonantTunnelingDoubleBarrier(
+    double E, double V0, double barrierWidth, double wellWidth)
+{
+    // Double barrier: barrier | well | barrier
+    // Three layers: barrier(V0, barrierWidth), well(0, wellWidth), barrier(V0, barrierWidth)
+    std::vector<double> widths  = { barrierWidth, wellWidth, barrierWidth };
+    std::vector<double> heights = { V0, 0.0, V0 };
+    return transferMatrixMultilayer(E, widths, heights);
+}
+
+void QuantumParticle::exportTransferMatrixCSV(
+    const std::string& filename,
+    const std::vector<double>& widths,
+    const std::vector<double>& heights,
+    double Emax, int numE)
+{
+    std::ofstream out(filename);
+    out << "E,T,R\n";
+    for (int i = 1; i <= numE; ++i) {
+        double E = Emax * i / numE;
+        auto res = transferMatrixMultilayer(E, widths, heights);
+        out << E << "," << res.T << "," << res.R << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportResonantTunnelingCSV(
+    const std::string& filename,
+    double V0, double barrierWidth, double wellWidth,
+    double Emax, int numE)
+{
+    std::ofstream out(filename);
+    out << "E,T,R\n";
+    for (int i = 1; i <= numE; ++i) {
+        double E = Emax * i / numE;
+        auto res = resonantTunnelingDoubleBarrier(E, V0, barrierWidth, wellWidth);
+        out << E << "," << res.T << "," << res.R << "\n";
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  38: DENSITY OF STATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Free-particle DOS per unit length (1D):
+// g(E) = (1/pi) * sqrt(2m / (hbar^2 E))   [states / (J * m)]
+double QuantumParticle::dos1D(double E, double m) {
+    const double hbar = 1.0545718e-34;
+    if (E <= 0.0) return 0.0;
+    return (1.0 / M_PI) * sqrt(2.0 * m / (hbar * hbar * E));
+}
+
+// Free-particle DOS per unit area (2D) – constant:
+// g(E) = m / (pi * hbar^2)   [states / (J * m^2)]
+double QuantumParticle::dos2D(double m) {
+    const double hbar = 1.0545718e-34;
+    return m / (M_PI * hbar * hbar);
+}
+
+// Free-particle DOS per unit volume (3D):
+// g(E) = (1/(2 pi^2)) * (2m/hbar^2)^{3/2} * sqrt(E)   [states / (J * m^3)]
+double QuantumParticle::dos3D(double E, double m) {
+    const double hbar = 1.0545718e-34;
+    if (E <= 0.0) return 0.0;
+    double factor = pow(2.0 * m / (hbar * hbar), 1.5);
+    return factor * sqrt(E) / (2.0 * M_PI * M_PI);
+}
+
+// DOS for a 1D box of length L (discrete levels broadened with Lorentzian)
+double QuantumParticle::dosBox1D(double E, double L, int maxN, double broadening) {
+    const double hbar = 1.0545718e-34;
+    double prefactor = hbar * hbar * M_PI * M_PI / (2.0 * mass * L * L);
+    double g = 0.0;
+    for (int n = 1; n <= maxN; ++n) {
+        double En = prefactor * n * n;
+        // Lorentzian broadening: delta(E - En) -> (gamma/pi) / ((E-En)^2 + gamma^2)
+        double diff = E - En;
+        g += (broadening / M_PI) / (diff * diff + broadening * broadening);
+    }
+    return g;
+}
+
+// DOS for 2D electron gas in a quantum well (step-function subbands)
+// g(E) = (m / (pi hbar^2)) * sum_n theta(E - E_n)
+double QuantumParticle::dosQuantumWell2DEG(double E, double Lz, double m, int maxSubbands) {
+    const double hbar = 1.0545718e-34;
+    double g2d = m / (M_PI * hbar * hbar);
+    double g = 0.0;
+    for (int n = 1; n <= maxSubbands; ++n) {
+        double En = hbar * hbar * M_PI * M_PI * n * n / (2.0 * m * Lz * Lz);
+        if (E >= En) g += g2d;
+    }
+    return g;
+}
+
+void QuantumParticle::exportDOSFreeCSV(const std::string& filename,
+    double Emax, int numE)
+{
+    std::ofstream out(filename);
+    out << "E,g1D,g2D,g3D\n";
+    double m = mass;
+    double g2d = dos2D(m);
+    for (int i = 1; i <= numE; ++i) {
+        double E = Emax * i / numE;
+        out << E << "," << dos1D(E, m) << "," << g2d << "," << dos3D(E, m) << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportDOSQuantumWellCSV(const std::string& filename,
+    double Lz, double Emax, int maxSubbands, int numE)
+{
+    std::ofstream out(filename);
+    out << "E,g_2DEG\n";
+    double m = mass;
+    for (int i = 1; i <= numE; ++i) {
+        double E = Emax * i / numE;
+        out << E << "," << dosQuantumWell2DEG(E, Lz, m, maxSubbands) << "\n";
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  39: COHERENT & SQUEEZED STATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Poisson distribution: P(n) = e^{-|alpha|^2} |alpha|^{2n} / n!
+double QuantumParticle::coherentStatePhotonProb(double alphaMag, int n) {
+    double nbar = alphaMag * alphaMag;
+    // Use log to avoid overflow for large n
+    double logP = -nbar + n * log(nbar) - lgamma(n + 1.0);
+    return exp(logP);
+}
+
+double QuantumParticle::coherentStateMeanN(double alphaMag) {
+    return alphaMag * alphaMag;
+}
+
+double QuantumParticle::coherentStateVarianceN(double alphaMag) {
+    return alphaMag * alphaMag;  // Var(n) = <n> for Poisson
+}
+
+// Coherent state wavefunction in position space:
+// psi(x,t) = (m*omega/(pi*hbar))^{1/4}
+//            * exp(-m*omega*(x - x0(t))^2 / (2*hbar))
+//            * exp(i * p0(t) * x / hbar)
+// where x0(t) = sqrt(2*hbar/(m*omega)) * |alpha| * cos(omega*t - phi)
+//       p0(t) = -sqrt(2*m*hbar*omega) * |alpha| * sin(omega*t - phi)
+double QuantumParticle::coherentStateWavefunction(
+    double alpha_r, double alpha_i,
+    double x, double omega, double t)
+{
+    const double hbar = 1.0545718e-34;
+    double alphaMag = sqrt(alpha_r * alpha_r + alpha_i * alpha_i);
+    double phi = atan2(alpha_i, alpha_r);
+
+    double x0 = sqrt(2.0 * hbar / (mass * omega)) * alphaMag * cos(omega * t - phi);
+
+    double prefactor = pow(mass * omega / (M_PI * hbar), 0.25);
+    double gaussian = exp(-mass * omega * (x - x0) * (x - x0) / (2.0 * hbar));
+
+    return prefactor * gaussian;  // return |psi(x,t)|
+}
+
+// Wigner function for coherent state: Gaussian in phase space
+// W(x,p) = (1/pi*hbar) exp(-m*omega*(x-x0)^2/hbar - (p-p0)^2/(m*omega*hbar))
+double QuantumParticle::wignerFunctionCoherent(
+    double alpha_r, double alpha_i,
+    double x, double p, double omega)
+{
+    const double hbar = 1.0545718e-34;
+    double alphaMag = sqrt(alpha_r * alpha_r + alpha_i * alpha_i);
+    double phi = atan2(alpha_i, alpha_r);
+
+    double x0 = sqrt(2.0 * hbar / (mass * omega)) * alphaMag * cos(phi);
+    double p0 = sqrt(2.0 * mass * hbar * omega) * alphaMag * sin(phi);
+
+    double dx = x - x0;
+    double dp = p - p0;
+
+    double exponent = -(mass * omega * dx * dx / hbar) - (dp * dp / (mass * omega * hbar));
+    return (1.0 / (M_PI * hbar)) * exp(exponent);
+}
+
+// Squeezed state uncertainties
+// Dx = sqrt(hbar/(2*m*omega)) * e^{-r}
+double QuantumParticle::squeezedUncertaintyX(double r, double omega, double m) {
+    const double hbar = 1.0545718e-34;
+    return sqrt(hbar / (2.0 * m * omega)) * exp(-r);
+}
+
+// Dp = sqrt(m*hbar*omega/2) * e^{r}
+double QuantumParticle::squeezedUncertaintyP(double r, double omega, double m) {
+    const double hbar = 1.0545718e-34;
+    return sqrt(m * hbar * omega / 2.0) * exp(r);
+}
+
+void QuantumParticle::exportCoherentStateCSV(
+    const std::string& filename, double alphaMag, double omega, int numX, int maxN)
+{
+    std::ofstream out(filename);
+
+    // Part 1: photon number distribution
+    out << "n,P_n\n";
+    for (int n = 0; n <= maxN; ++n) {
+        out << n << "," << coherentStatePhotonProb(alphaMag, n) << "\n";
+    }
+    out << "\n";
+
+    // Part 2: wavefunction |psi(x,t=0)|
+    out << "x,psi\n";
+    const double hbar = 1.0545718e-34;
+    double xMax = 5.0 * sqrt(hbar / (mass * omega));
+    double dx = 2.0 * xMax / numX;
+    for (int i = 0; i < numX; ++i) {
+        double x = -xMax + i * dx;
+        double psi = coherentStateWavefunction(alphaMag, 0.0, x, omega, 0.0);
+        out << x << "," << psi << "\n";
+    }
+
+    out.close();
+}
+
+void QuantumParticle::exportWignerCSV(
+    const std::string& filename,
+    double alpha_r, double alpha_i, double omega, int numX, int numP)
+{
+    std::ofstream out(filename);
+    out << "x,p,W\n";
+
+    const double hbar = 1.0545718e-34;
+    double xMax = 5.0 * sqrt(hbar / (mass * omega));
+    double pMax = 5.0 * sqrt(mass * hbar * omega);
+
+    double dx = 2.0 * xMax / numX;
+    double dp = 2.0 * pMax / numP;
+
+    for (int i = 0; i < numX; ++i) {
+        double x = -xMax + i * dx;
+        for (int j = 0; j < numP; ++j) {
+            double p = -pMax + j * dp;
+            double W = wignerFunctionCoherent(alpha_r, alpha_i, x, p, omega);
+            out << x << "," << p << "," << W << "\n";
+        }
+    }
+    out.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  40: QUANTUM ENTANGLEMENT & BELL STATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Basis: |00>=0, |01>=1, |10>=2, |11>=3
+
+// |Phi+> = (|00> + |11>) / sqrt(2),  |Phi-> = (|00> - |11>) / sqrt(2)
+QuantumParticle::TwoQubitState QuantumParticle::bellStatePhi(bool plus) {
+    double s = 1.0 / sqrt(2.0);
+    double sign = plus ? 1.0 : -1.0;
+    return {{ {s, 0}, {0, 0}, {0, 0}, {sign * s, 0} }};
+}
+
+// |Psi+> = (|01> + |10>) / sqrt(2),  |Psi-> = (|01> - |10>) / sqrt(2)
+QuantumParticle::TwoQubitState QuantumParticle::bellStatePsi(bool plus) {
+    double s = 1.0 / sqrt(2.0);
+    double sign = plus ? 1.0 : -1.0;
+    return {{ {0, 0}, {s, 0}, {sign * s, 0}, {0, 0} }};
+}
+
+// rho = |psi><psi|
+QuantumParticle::DensityMatrix4 QuantumParticle::densityMatrixFromState(const TwoQubitState& psi) {
+    DensityMatrix4 rho;
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            rho[i][j] = psi[i] * std::conj(psi[j]);
+    return rho;
+}
+
+// Partial trace over qubit B: rho_A[i][j] = sum_k rho[2*i+k][2*j+k]
+SpinMatrix QuantumParticle::partialTraceB(const DensityMatrix4& rho) {
+    SpinMatrix rhoA = {{ {{{0,0},{0,0}}}, {{{0,0},{0,0}}} }};
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            for (int k = 0; k < 2; ++k)
+                rhoA[i][j] += rho[2 * i + k][2 * j + k];
+    return rhoA;
+}
+
+// Partial trace over qubit A: rho_B[i][j] = sum_k rho[2*k+i][2*k+j]
+SpinMatrix QuantumParticle::partialTraceA(const DensityMatrix4& rho) {
+    SpinMatrix rhoB = {{ {{{0,0},{0,0}}}, {{{0,0},{0,0}}} }};
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            for (int k = 0; k < 2; ++k)
+                rhoB[i][j] += rho[2 * k + i][2 * k + j];
+    return rhoB;
+}
+
+// Von Neumann entropy for 2x2 density matrix
+// S = -lambda1*ln(lambda1) - lambda2*ln(lambda2)
+// Eigenvalues of 2x2 Hermitian: (tr ± sqrt(tr^2 - 4*det)) / 2
+double QuantumParticle::vonNeumannEntropy2x2(const SpinMatrix& rho) {
+    double tr = rho[0][0].real() + rho[1][1].real();
+    double det = (rho[0][0] * rho[1][1] - rho[0][1] * rho[1][0]).real();
+    double disc = tr * tr - 4.0 * det;
+    if (disc < 0) disc = 0;
+    double lam1 = (tr + sqrt(disc)) / 2.0;
+    double lam2 = (tr - sqrt(disc)) / 2.0;
+
+    double S = 0.0;
+    if (lam1 > 1e-15) S -= lam1 * log(lam1);
+    if (lam2 > 1e-15) S -= lam2 * log(lam2);
+    return S;
+}
+
+// Concurrence for a two-qubit pure state |psi> = a|00> + b|01> + c|10> + d|11>
+// C = 2|ad - bc|
+double QuantumParticle::concurrence(const TwoQubitState& psi) {
+    std::complex<double> a = psi[0], b = psi[1], c = psi[2], d = psi[3];
+    return 2.0 * std::abs(a * d - b * c);
+}
+
+// CHSH correlator E(a,b) = <psi| (sigma_a tensor sigma_b) |psi>
+// Measurement axis in xz plane: sigma_theta = cos(theta)*sigma_z + sin(theta)*sigma_x
+// sigma_theta|0> = cos(theta)|0> + sin(theta)|1>
+// sigma_theta|1> = sin(theta)|0> - cos(theta)|1>
+double QuantumParticle::chshCorrelator(const TwoQubitState& psi,
+    double thetaA, double thetaB)
+{
+    // Build the 4x4 operator (sigma_A tensor sigma_B)
+    // sigma_theta = [[cos(t), sin(t)], [sin(t), -cos(t)]]
+    double cA = cos(thetaA), sA = sin(thetaA);
+    double cB = cos(thetaB), sB = sin(thetaB);
+
+    // sigA[i][j], sigB[i][j]
+    double sigA[2][2] = { {cA, sA}, {sA, -cA} };
+    double sigB[2][2] = { {cB, sB}, {sB, -cB} };
+
+    // Tensor product: M[2*i+k][2*j+l] = sigA[i][j] * sigB[k][l]
+    double M[4][4];
+    for (int i = 0; i < 2; ++i)
+        for (int j = 0; j < 2; ++j)
+            for (int k = 0; k < 2; ++k)
+                for (int l = 0; l < 2; ++l)
+                    M[2 * i + k][2 * j + l] = sigA[i][j] * sigB[k][l];
+
+    // <psi|M|psi>
+    std::complex<double> result(0, 0);
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            result += std::conj(psi[i]) * M[i][j] * psi[j];
+
+    return result.real();
+}
+
+// S = E(a,b) - E(a,b') + E(a',b) + E(a',b')
+double QuantumParticle::chshS(const TwoQubitState& psi,
+    double thetaA, double thetaAp, double thetaB, double thetaBp)
+{
+    return chshCorrelator(psi, thetaA, thetaB)
+         - chshCorrelator(psi, thetaA, thetaBp)
+         + chshCorrelator(psi, thetaAp, thetaB)
+         + chshCorrelator(psi, thetaAp, thetaBp);
+}
+
+// Measurement probability P(outcomeA, outcomeB | thetaA, thetaB)
+// Project onto eigenstates of sigma_theta
+double QuantumParticle::measurementProb(const TwoQubitState& psi,
+    int outcomeA, int outcomeB, double thetaA, double thetaB)
+{
+    // Eigenstates of sigma_theta:
+    // |+> = cos(theta/2)|0> + sin(theta/2)|1>
+    // |-> = -sin(theta/2)|0> + cos(theta/2)|1>
+    std::complex<double> eA[2], eB[2]; // eigenvector components
+
+    if (outcomeA == 1) {
+        eA[0] = cos(thetaA / 2.0);
+        eA[1] = sin(thetaA / 2.0);
+    } else {
+        eA[0] = -sin(thetaA / 2.0);
+        eA[1] = cos(thetaA / 2.0);
+    }
+
+    if (outcomeB == 1) {
+        eB[0] = cos(thetaB / 2.0);
+        eB[1] = sin(thetaB / 2.0);
+    } else {
+        eB[0] = -sin(thetaB / 2.0);
+        eB[1] = cos(thetaB / 2.0);
+    }
+
+    // Product state: |eA> tensor |eB>
+    // proj[2*i+k] = eA[i] * eB[k]
+    std::complex<double> overlap(0, 0);
+    for (int i = 0; i < 2; ++i)
+        for (int k = 0; k < 2; ++k)
+            overlap += std::conj(eA[i] * eB[k]) * psi[2 * i + k];
+
+    return std::norm(overlap);
+}
+
+void QuantumParticle::exportBellStateAnalysisCSV(const std::string& filename) {
+    std::ofstream out(filename);
+    out << "state,concurrence,entropy_A,entropy_B,rhoA_00,rhoA_11\n";
+
+    struct BellInfo {
+        std::string name;
+        TwoQubitState psi;
+    };
+
+    BellInfo states[] = {
+        { "Phi+", bellStatePhi(true) },
+        { "Phi-", bellStatePhi(false) },
+        { "Psi+", bellStatePsi(true) },
+        { "Psi-", bellStatePsi(false) }
+    };
+
+    for (auto& s : states) {
+        auto rho = densityMatrixFromState(s.psi);
+        auto rhoA = partialTraceB(rho);
+        auto rhoB = partialTraceA(rho);
+        double C = concurrence(s.psi);
+        double SA = vonNeumannEntropy2x2(rhoA);
+        double SB = vonNeumannEntropy2x2(rhoB);
+        out << s.name << "," << C << "," << SA << "," << SB
+            << "," << rhoA[0][0].real() << "," << rhoA[1][1].real() << "\n";
+    }
+    out.close();
+}
+
+void QuantumParticle::exportCHSHSweepCSV(const std::string& filename,
+    const TwoQubitState& psi, int numAngles)
+{
+    std::ofstream out(filename);
+    out << "thetaB,E_correlator,S_chsh\n";
+
+    // Fix Alice at 0, Alice' at pi/4; sweep Bob's angle
+    double thetaA = 0.0;
+    double thetaAp = M_PI / 4.0;
+    double thetaBp_offset = M_PI / 4.0; // b' = b + pi/4
+
+    for (int i = 0; i <= numAngles; ++i) {
+        double thetaB = M_PI * i / numAngles;
+        double thetaBp = thetaB + thetaBp_offset;
+        double E = chshCorrelator(psi, thetaA, thetaB);
+        double S = chshS(psi, thetaA, thetaAp, thetaB, thetaBp);
+        out << thetaB << "," << E << "," << S << "\n";
+    }
+    out.close();
+}

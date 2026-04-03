@@ -140,9 +140,15 @@ void GuiApp::renderSidebar()
         "32  Full Hydrogen Atom",
         "33  Fine Structure",
         "34  Zeeman Effect",
+        "35  Partial Wave Analysis",
+        "36  Born Approximation",
+        "37  Transfer Matrix",
+        "38  Density of States",
+        "39  Coherent/Squeezed",
+        "40  Entanglement/Bell",
     };
 
-    for (int i = 0; i < 34; ++i) {
+    for (int i = 0; i < 40; ++i) {
         if (ImGui::Selectable(names[i], selectedSim == i))
             selectedSim = i;
     }
@@ -191,6 +197,12 @@ void GuiApp::renderParameters()
     case 31: renderSim32_FullHydrogen();     break;
     case 32: renderSim33_FineStructure();    break;
     case 33: renderSim34_Zeeman();           break;
+    case 34: renderSim35_PartialWaves();     break;
+    case 35: renderSim36_BornApprox();        break;
+    case 36: renderSim37_TransferMatrix();     break;
+    case 37: renderSim38_DensityOfStates();     break;
+    case 38: renderSim39_CoherentSqueezed();       break;
+    case 39: renderSim40_Entanglement();            break;
     default: break;
     }
 
@@ -2010,6 +2022,788 @@ void GuiApp::renderSim34_Zeeman()
             }
             resultText = o.str();
             clearPlot();
+        }
+    }
+}
+
+// ── 35: Partial Wave Analysis ──────────────────────────────────────────────
+void GuiApp::renderSim35_PartialWaves()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Partial Wave Analysis");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("View", &mode,
+                 "Phase shifts & total cross section\0Differential cross section\0");
+
+    static double V0 = 5.0 * EV;   // well depth
+    static double a  = 1e-10;       // well radius
+    static int lMax  = 5;
+
+    ImGui::InputDouble("V0 (J)", &V0, 0, 0, "%.3e");
+    ImGui::InputDouble("Radius a (m)", &a, 0, 0, "%.3e");
+    ImGui::SliderInt("l_max", &lMax, 0, 15);
+
+    if (mode == 0) {
+        static double Emax = 20.0 * EV;
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 300;
+            std::vector<double> ev(N);
+            std::vector<double> sigTotal(N);
+
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                double k = sqrt(2.0 * particle.mass * E) / HBAR;
+                double st = 0.0;
+                for (int l = 0; l <= lMax; ++l) {
+                    double delta = particle.phaseShiftFiniteWell(l, E, V0, a);
+                    st += QuantumParticle::partialWaveCrossSection(l, k, delta);
+                }
+                sigTotal[i] = st * 1e20;
+            }
+
+            addCurve("sigma_total (A^2)", ev, sigTotal);
+            plotTitle  = "Total Cross Section vs Energy";
+            plotXLabel = "E (eV)";
+            plotYLabel = "sigma (Angstrom^2)";
+
+            std::ostringstream o;
+            o << "Partial wave analysis: finite spherical well\n"
+              << "V0 = " << V0 / EV << " eV, a = " << a * 1e10 << " A, l_max = " << lMax << "\n\n"
+              << "Phase shifts at E_max:\n";
+            for (int l = 0; l <= lMax; ++l) {
+                double d = particle.phaseShiftFiniteWell(l, Emax, V0, a);
+                o << "  delta_" << l << " = " << d << " rad\n";
+            }
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportPartialWaveCSV("partial_waves.csv", V0, a, lMax, Emax, 300);
+    }
+    else {
+        static double E = 5.0 * EV;
+        ImGui::InputDouble("Energy E (J)", &E, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 360;
+            std::vector<double> tv(N), dsv(N);
+            for (int i = 0; i < N; ++i) {
+                double theta = M_PI * i / (N - 1);
+                tv[i] = theta * 180.0 / M_PI;
+                dsv[i] = particle.differentialCrossSection(E, V0, a, lMax, theta) * 1e20;
+            }
+            addCurve("dsigma/dOmega (A^2/sr)", tv, dsv);
+            plotTitle  = "Differential Cross Section";
+            plotXLabel = "theta (deg)";
+            plotYLabel = "dsigma/dOmega (Angstrom^2/sr)";
+
+            double sigT = particle.totalCrossSection(E, V0, a, lMax);
+            std::ostringstream o;
+            o << "Differential cross section at E = " << E / EV << " eV\n"
+              << "Total cross section: " << sigT << " m^2 = "
+              << sigT * 1e20 << " Angstrom^2\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportDifferentialCSV("differential_cs.csv", E, V0, a, lMax, 360);
+    }
+}
+
+// ── 36: Born Approximation ─────────────────────────────────────────────────
+void GuiApp::renderSim36_BornApprox()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Born Approximation");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("View", &mode,
+                 "Differential (Born vs Exact)\0Total cross section comparison\0Yukawa / Coulomb\0");
+
+    static double V0 = 5.0 * EV;
+    static double a  = 1e-10;
+    ImGui::InputDouble("V0 (J)", &V0, 0, 0, "%.3e");
+    ImGui::InputDouble("Radius a (m)", &a, 0, 0, "%.3e");
+
+    if (mode == 0) {
+        static double E = 10.0 * EV;
+        static int lMax = 8;
+        ImGui::InputDouble("Energy E (J)", &E, 0, 0, "%.3e");
+        ImGui::SliderInt("l_max (exact)", &lMax, 1, 20);
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            double k = sqrt(2.0 * particle.mass * E) / HBAR;
+            int N = 360;
+            std::vector<double> tv(N), bornv(N), exactv(N);
+            for (int i = 0; i < N; ++i) {
+                double theta = M_PI * (i + 0.001) / (N - 1);
+                tv[i] = theta * 180.0 / M_PI;
+                double q = 2.0 * k * sin(theta / 2.0);
+                double fb = QuantumParticle::bornAmplitudeSphericalWell(q, V0, a, particle.mass);
+                bornv[i] = fb * fb * 1e20;
+                exactv[i] = particle.differentialCrossSection(E, V0, a, lMax, theta) * 1e20;
+            }
+            addCurve("Born", tv, bornv);
+            addCurve("Exact (partial waves)", tv, exactv);
+            plotTitle  = "Differential Cross Section: Born vs Exact";
+            plotXLabel = "theta (deg)";
+            plotYLabel = "dsigma/dOmega (Angstrom^2/sr)";
+
+            double sigBorn = QuantumParticle::bornTotalCrossSectionSphericalWell(k, V0, a, particle.mass);
+            double sigExact = particle.totalCrossSection(E, V0, a, lMax);
+            std::ostringstream o;
+            o << "E = " << E / EV << " eV,  ka = " << k * a << "\n\n"
+              << "Total cross section:\n"
+              << "  Born:  " << sigBorn * 1e20 << " A^2\n"
+              << "  Exact: " << sigExact * 1e20 << " A^2\n"
+              << "  Ratio Born/Exact: " << sigBorn / (sigExact + 1e-50) << "\n\n"
+              << "Born approx is valid when ka << 1 or E >> V0.\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportBornDifferentialCSV("born_differential.csv", E, V0, a, 360);
+    }
+    else if (mode == 1) {
+        static double Emax = 50.0 * EV;
+        static int lMax = 10;
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+        ImGui::SliderInt("l_max (exact)", &lMax, 1, 20);
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 300;
+            std::vector<double> ev(N), bornSig(N), exactSig(N);
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                double k = sqrt(2.0 * particle.mass * E) / HBAR;
+                bornSig[i] = QuantumParticle::bornTotalCrossSectionSphericalWell(k, V0, a, particle.mass) * 1e20;
+                exactSig[i] = particle.totalCrossSection(E, V0, a, lMax) * 1e20;
+            }
+            addCurve("Born sigma (A^2)", ev, bornSig);
+            addCurve("Exact sigma (A^2)", ev, exactSig);
+            plotTitle  = "Total Cross Section: Born vs Exact";
+            plotXLabel = "E (eV)";
+            plotYLabel = "sigma (Angstrom^2)";
+
+            std::ostringstream o;
+            o << "Born vs exact total cross section for spherical well\n"
+              << "V0 = " << V0 / EV << " eV, a = " << a * 1e10 << " A\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportBornVsExactCSV("born_vs_exact.csv", V0, a, lMax, Emax, 300);
+    }
+    else {
+        static int potential = 0;
+        ImGui::Combo("Potential", &potential, "Yukawa\0Screened Coulomb\0");
+        static double V0y = 5.0 * EV;
+        static double mu = 1e10;
+        static double E = 10.0 * EV;
+        static double Z = 1.0;
+
+        if (potential == 0) {
+            ImGui::InputDouble("V0 (J)", &V0y, 0, 0, "%.3e");
+            ImGui::InputDouble("mu (1/m)", &mu, 0, 0, "%.3e");
+        } else {
+            ImGui::InputDouble("Z", &Z);
+            ImGui::InputDouble("screening mu (1/m)", &mu, 0, 0, "%.3e");
+        }
+        ImGui::InputDouble("Energy E (J)", &E, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            double k = sqrt(2.0 * particle.mass * E) / HBAR;
+            int N = 360;
+            std::vector<double> tv(N), dsv(N);
+            for (int i = 0; i < N; ++i) {
+                double theta = M_PI * (i + 0.001) / (N - 1);
+                tv[i] = theta * 180.0 / M_PI;
+                double q = 2.0 * k * sin(theta / 2.0);
+                double f;
+                if (potential == 0)
+                    f = QuantumParticle::bornAmplitudeYukawa(q, V0y, mu, particle.mass);
+                else
+                    f = QuantumParticle::bornAmplitudeCoulomb(q, Z, particle.mass, mu);
+                dsv[i] = f * f * 1e20;
+            }
+            addCurve("dsigma/dOmega (A^2/sr)", tv, dsv);
+            plotTitle  = (potential == 0) ? "Yukawa Born Approx" : "Screened Coulomb Born Approx";
+            plotXLabel = "theta (deg)";
+            plotYLabel = "dsigma/dOmega (Angstrom^2/sr)";
+
+            std::ostringstream o;
+            o << ((potential == 0) ? "Yukawa" : "Screened Coulomb") << " Born approximation\n"
+              << "E = " << E / EV << " eV, k = " << k << " 1/m\n";
+            resultText = o.str();
+        }
+    }
+}
+
+// ── 37  Transfer Matrix Method ──────────────────────────────────────────────
+void GuiApp::renderSim37_TransferMatrix()
+{
+    ImGui::Text("37 · Transfer Matrix Method");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("Mode", &mode,
+        "Resonant Tunneling (Double Barrier)\0Custom Multilayer\0");
+
+    if (mode == 0) {
+        static double V0 = 5.0 * EV;
+        static double bw = 1e-10;   // barrier width
+        static double ww = 3e-10;   // well width
+        static double Emax = 10.0 * EV;
+        ImGui::InputDouble("Barrier V0 (J)", &V0, 0, 0, "%.3e");
+        ImGui::InputDouble("Barrier width (m)", &bw, 0, 0, "%.3e");
+        ImGui::InputDouble("Well width (m)", &ww, 0, 0, "%.3e");
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 500;
+            std::vector<double> ev(N), tv(N), rv(N);
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                auto res = particle.resonantTunnelingDoubleBarrier(E, V0, bw, ww);
+                tv[i] = res.T;
+                rv[i] = res.R;
+            }
+            addCurve("T (transmission)", ev, tv);
+            addCurve("R (reflection)", ev, rv);
+            plotTitle  = "Resonant Tunneling – Double Barrier";
+            plotXLabel = "E (eV)";
+            plotYLabel = "Coefficient";
+
+            std::ostringstream o;
+            o << "Double barrier: V0 = " << V0 / EV << " eV\n"
+              << "Barrier width = " << bw * 1e10 << " A, Well width = " << ww * 1e10 << " A\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportResonantTunnelingCSV("resonant_tunneling.csv", V0, bw, ww, Emax, 500);
+    }
+    else {
+        // Custom multilayer: user picks number of layers
+        static int numLayers = 3;
+        static std::vector<double> widths(3, 1e-10);
+        static std::vector<double> heights(3, 5.0 * EV);
+        static double Emax = 10.0 * EV;
+
+        if (ImGui::SliderInt("Layers", &numLayers, 1, 10)) {
+            widths.resize(numLayers, 1e-10);
+            heights.resize(numLayers, 5.0 * EV);
+        }
+
+        for (int i = 0; i < numLayers; ++i) {
+            ImGui::PushID(i);
+            char label[64];
+            snprintf(label, sizeof(label), "Layer %d width (m)", i + 1);
+            ImGui::InputDouble(label, &widths[i], 0, 0, "%.3e");
+            snprintf(label, sizeof(label), "Layer %d V (J)", i + 1);
+            ImGui::InputDouble(label, &heights[i], 0, 0, "%.3e");
+            ImGui::PopID();
+        }
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 500;
+            std::vector<double> ev(N), tv(N), rv(N);
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                auto res = particle.transferMatrixMultilayer(E, widths, heights);
+                tv[i] = res.T;
+                rv[i] = res.R;
+            }
+            addCurve("T (transmission)", ev, tv);
+            addCurve("R (reflection)", ev, rv);
+            plotTitle  = "Transfer Matrix – Custom Multilayer";
+            plotXLabel = "E (eV)";
+            plotYLabel = "Coefficient";
+
+            std::ostringstream o;
+            o << "Custom multilayer: " << numLayers << " layers\n";
+            for (int i = 0; i < numLayers; ++i)
+                o << "  Layer " << (i+1) << ": d=" << widths[i]*1e10
+                  << " A, V=" << heights[i]/EV << " eV\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportTransferMatrixCSV("transfer_matrix.csv", widths, heights, Emax, 500);
+    }
+}
+
+// ── 38  Density of States ─────────────────────────────────────────────────
+void GuiApp::renderSim38_DensityOfStates()
+{
+    ImGui::Text("38 \xc2\xb7 Density of States");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("Mode", &mode,
+        "Free Particle (1D/2D/3D)\0Particle in 1D Box\0Quantum Well 2DEG\0");
+
+    if (mode == 0) {
+        static double Emax = 5.0 * EV;
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 400;
+            std::vector<double> ev(N), g1v(N), g2v(N), g3v(N);
+            double m = particle.mass;
+            double g2d_val = QuantumParticle::dos2D(m);
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                g1v[i] = QuantumParticle::dos1D(E, m);
+                g2v[i] = g2d_val;
+                g3v[i] = QuantumParticle::dos3D(E, m);
+            }
+            addCurve("g(E) 1D", ev, g1v);
+            addCurve("g(E) 2D", ev, g2v);
+            addCurve("g(E) 3D", ev, g3v);
+            plotTitle  = "Free-Particle Density of States";
+            plotXLabel = "E (eV)";
+            plotYLabel = "g(E)";
+
+            std::ostringstream o;
+            o << "Free-particle DOS for mass = " << m << " kg\n"
+              << "1D: ~1/sqrt(E), 2D: constant, 3D: ~sqrt(E)\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportDOSFreeCSV("dos_free.csv", Emax, 400);
+    }
+    else if (mode == 1) {
+        static double L = 1e-9;
+        static double Emax = 5.0 * EV;
+        static int maxN = 20;
+        static double broadening = 0.05 * EV;
+        ImGui::InputDouble("Box length L (m)", &L, 0, 0, "%.3e");
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+        ImGui::SliderInt("Max n", &maxN, 5, 100);
+        ImGui::InputDouble("Broadening gamma (J)", &broadening, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 400;
+            std::vector<double> ev(N), gv(N);
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                gv[i] = particle.dosBox1D(E, L, maxN, broadening);
+            }
+            addCurve("g(E) box 1D", ev, gv);
+            plotTitle  = "DOS \xe2\x80\x93 Particle in 1D Box";
+            plotXLabel = "E (eV)";
+            plotYLabel = "g(E)";
+
+            std::ostringstream o;
+            o << "1D box DOS: L = " << L * 1e9 << " nm, "
+              << maxN << " levels, gamma = " << broadening / EV << " eV\n";
+            resultText = o.str();
+        }
+    }
+    else {
+        static double Lz = 5e-9;
+        static double Emax = 2.0 * EV;
+        static int maxSub = 5;
+        ImGui::InputDouble("Well width Lz (m)", &Lz, 0, 0, "%.3e");
+        ImGui::InputDouble("E_max (J)", &Emax, 0, 0, "%.3e");
+        ImGui::SliderInt("Max subbands", &maxSub, 1, 20);
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            int N = 400;
+            std::vector<double> ev(N), gv(N);
+            for (int i = 0; i < N; ++i) {
+                double E = Emax * (i + 1) / N;
+                ev[i] = E / EV;
+                gv[i] = QuantumParticle::dosQuantumWell2DEG(E, Lz, particle.mass, maxSub);
+            }
+            addCurve("g(E) 2DEG", ev, gv);
+            plotTitle  = "DOS \xe2\x80\x93 2D Electron Gas (Quantum Well)";
+            plotXLabel = "E (eV)";
+            plotYLabel = "g(E)";
+
+            std::ostringstream o;
+            o << "Quantum well 2DEG: Lz = " << Lz * 1e9 << " nm, "
+              << maxSub << " subbands\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportDOSQuantumWellCSV("dos_quantum_well.csv", Lz, Emax, maxSub, 400);
+    }
+}
+
+// ── 39: Coherent & Squeezed States ─────────────────────────────────────────
+void GuiApp::renderSim39_CoherentSqueezed()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Coherent & Squeezed States");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("Mode", &mode,
+                 "Photon Statistics\0Wavefunction & Wigner\0Squeezed Uncertainties\0");
+
+    if (mode == 0) {
+        static double alphaMag = 3.0;
+        static int maxN = 30;
+        ImGui::InputDouble("|alpha|", &alphaMag, 0.1, 1.0, "%.2f");
+        if (alphaMag < 0) alphaMag = 0;
+        ImGui::SliderInt("Max n", &maxN, 5, 80);
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            double meanN = QuantumParticle::coherentStateMeanN(alphaMag);
+            double varN  = QuantumParticle::coherentStateVarianceN(alphaMag);
+
+            std::vector<double> ns(maxN + 1), probs(maxN + 1);
+            for (int n = 0; n <= maxN; ++n) {
+                ns[n] = (double)n;
+                probs[n] = QuantumParticle::coherentStatePhotonProb(alphaMag, n);
+            }
+            addCurve("P(n)", ns, probs);
+            plotTitle  = "Photon Number Distribution (Poisson)";
+            plotXLabel = "n";
+            plotYLabel = "P(n)";
+
+            std::ostringstream o;
+            o << "Coherent state |alpha> with |alpha| = " << alphaMag << "\n"
+              << "  <n>   = |alpha|^2 = " << meanN << "\n"
+              << "  Var(n)= |alpha|^2 = " << varN << "\n"
+              << "  sigma_n = " << sqrt(varN) << "\n"
+              << "  Poisson distribution: P(n) = e^{-<n>} <n>^n / n!\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportCoherentStateCSV("coherent_state.csv", alphaMag, 1e15, 400, maxN);
+    }
+    else if (mode == 1) {
+        static double alpha_r = 3.0;
+        static double alpha_i = 0.0;
+        static double omega = 1e15;
+        ImGui::InputDouble("Re(alpha)", &alpha_r, 0.1, 1.0, "%.2f");
+        ImGui::InputDouble("Im(alpha)", &alpha_i, 0.1, 1.0, "%.2f");
+        ImGui::InputDouble("omega (rad/s)", &omega, 0, 0, "%.3e");
+
+        static int viewType = 0;
+        ImGui::Combo("View", &viewType, "|psi(x)|\0Wigner W(x,0)\0");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            const double hbar = 1.0545718e-34;
+            double xMax = 5.0 * sqrt(hbar / (particle.mass * omega));
+            int N = 400;
+
+            if (viewType == 0) {
+                std::vector<double> xv(N), pv(N);
+                double dx = 2.0 * xMax / N;
+                for (int i = 0; i < N; ++i) {
+                    double x = -xMax + i * dx;
+                    xv[i] = x * 1e9;
+                    pv[i] = particle.coherentStateWavefunction(alpha_r, alpha_i, x, omega, 0.0);
+                }
+                addCurve("|psi(x)|", xv, pv);
+                plotTitle  = "Coherent State Wavefunction";
+                plotXLabel = "x (nm)";
+                plotYLabel = "|psi|";
+            }
+            else {
+                std::vector<double> xv(N), wv(N);
+                double dx = 2.0 * xMax / N;
+                for (int i = 0; i < N; ++i) {
+                    double x = -xMax + i * dx;
+                    xv[i] = x * 1e9;
+                    wv[i] = particle.wignerFunctionCoherent(alpha_r, alpha_i, x, 0.0, omega);
+                }
+                addCurve("W(x, p=0)", xv, wv);
+                plotTitle  = "Wigner Function (p=0 slice)";
+                plotXLabel = "x (nm)";
+                plotYLabel = "W";
+            }
+
+            double alphaMag = sqrt(alpha_r * alpha_r + alpha_i * alpha_i);
+            double meanN = QuantumParticle::coherentStateMeanN(alphaMag);
+            std::ostringstream o;
+            o << "alpha = " << alpha_r << " + " << alpha_i << "i\n"
+              << "|alpha| = " << alphaMag << ",  <n> = " << meanN << "\n"
+              << "omega = " << omega << " rad/s\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export Wigner CSV"))
+            particle.exportWignerCSV("wigner_coherent.csv", alpha_r, alpha_i, omega, 100, 100);
+    }
+    else {
+        static double rParam = 1.0;
+        static double omega = 1e15;
+        ImGui::InputDouble("Squeeze parameter r", &rParam, 0.1, 0.5, "%.2f");
+        if (rParam < 0) rParam = 0;
+        ImGui::InputDouble("omega (rad/s)", &omega, 0, 0, "%.3e");
+
+        if (ImGui::Button("Compute")) {
+            clearPlot();
+            const double hbar = 1.0545718e-34;
+
+            // Sweep squeeze parameter from 0 to rMax
+            double rMax = 3.0;
+            int N = 200;
+            std::vector<double> rv(N), dxv(N), dpv(N), prodv(N);
+            for (int i = 0; i < N; ++i) {
+                double ri = rMax * i / (N - 1);
+                double dx = QuantumParticle::squeezedUncertaintyX(ri, omega, particle.mass);
+                double dp = QuantumParticle::squeezedUncertaintyP(ri, omega, particle.mass);
+                rv[i]   = ri;
+                dxv[i]  = dx;
+                dpv[i]  = dp;
+                prodv[i]= dx * dp;
+            }
+            addCurve("Dx", rv, dxv);
+            addCurve("Dp", rv, dpv);
+            addCurve("Dx*Dp", rv, prodv);
+            plotTitle  = "Squeezed State Uncertainties";
+            plotXLabel = "Squeeze parameter r";
+            plotYLabel = "Uncertainty";
+
+            double Dx = QuantumParticle::squeezedUncertaintyX(rParam, omega, particle.mass);
+            double Dp = QuantumParticle::squeezedUncertaintyP(rParam, omega, particle.mass);
+
+            std::ostringstream o;
+            o << "Squeezed state (r = " << rParam << "):\n"
+              << "  Dx = sqrt(hbar/2mw) * e^{-r} = " << Dx << " m\n"
+              << "  Dp = sqrt(m*hbar*w/2) * e^{r} = " << Dp << " kg*m/s\n"
+              << "  Dx*Dp = " << Dx * Dp << " J*s\n"
+              << "  hbar/2 = " << hbar / 2.0 << " J*s\n"
+              << "  Minimum uncertainty preserved: Dx*Dp = hbar/2\n";
+            resultText = o.str();
+        }
+    }
+}
+
+// ── 40: Quantum Entanglement & Bell States ─────────────────────────────────
+void GuiApp::renderSim40_Entanglement()
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1, 1), "Quantum Entanglement & Bell States");
+    ImGui::Separator();
+
+    static int mode = 0;
+    ImGui::Combo("Mode", &mode,
+                 "Bell State Analysis\0CHSH Inequality\0Custom State\0");
+
+    if (mode == 0) {
+        static int bellIdx = 0;
+        ImGui::Combo("Bell State", &bellIdx,
+                     "|Phi+>\0|Phi->\0|Psi+>\0|Psi->\0");
+
+        if (ImGui::Button("Compute")) {
+            QuantumParticle::TwoQubitState psi;
+            std::string stateName;
+            switch (bellIdx) {
+                case 0: psi = QuantumParticle::bellStatePhi(true);  stateName = "|Phi+>"; break;
+                case 1: psi = QuantumParticle::bellStatePhi(false); stateName = "|Phi->"; break;
+                case 2: psi = QuantumParticle::bellStatePsi(true);  stateName = "|Psi+>"; break;
+                case 3: psi = QuantumParticle::bellStatePsi(false); stateName = "|Psi->"; break;
+                default: psi = QuantumParticle::bellStatePhi(true); stateName = "|Phi+>"; break;
+            }
+
+            auto rho = QuantumParticle::densityMatrixFromState(psi);
+            auto rhoA = QuantumParticle::partialTraceB(rho);
+            auto rhoB = QuantumParticle::partialTraceA(rho);
+            double C = QuantumParticle::concurrence(psi);
+            double SA = QuantumParticle::vonNeumannEntropy2x2(rhoA);
+            double SB = QuantumParticle::vonNeumannEntropy2x2(rhoB);
+
+            // Plot measurement correlations: P(++), P(+-), P(-+), P(--) vs Bob angle
+            clearPlot();
+            int N = 200;
+            std::vector<double> angles(N), pp(N), pm(N), mp(N), mm(N);
+            for (int i = 0; i < N; ++i) {
+                double tB = M_PI * i / (N - 1);
+                angles[i] = tB * 180.0 / M_PI;
+                pp[i] = QuantumParticle::measurementProb(psi, 1, 1, 0.0, tB);
+                pm[i] = QuantumParticle::measurementProb(psi, 1, -1, 0.0, tB);
+                mp[i] = QuantumParticle::measurementProb(psi, -1, 1, 0.0, tB);
+                mm[i] = QuantumParticle::measurementProb(psi, -1, -1, 0.0, tB);
+            }
+            addCurve("P(+,+)", angles, pp);
+            addCurve("P(+,-)", angles, pm);
+            addCurve("P(-,+)", angles, mp);
+            addCurve("P(-,-)", angles, mm);
+            plotTitle  = "Measurement Correlations (Alice @ 0)";
+            plotXLabel = "Bob angle (deg)";
+            plotYLabel = "Probability";
+
+            std::ostringstream o;
+            o << "Bell state: " << stateName << "\n"
+              << "|psi> = (" << psi[0].real() << "|00> + " << psi[1].real()
+              << "|01> + " << psi[2].real() << "|10> + " << psi[3].real() << "|11>)\n\n"
+              << "Concurrence C = " << C << "  (0=separable, 1=max entangled)\n"
+              << "Von Neumann entropy S_A = " << SA << " nats\n"
+              << "Von Neumann entropy S_B = " << SB << " nats\n"
+              << "  (S_max = ln(2) = " << log(2.0) << " for maximally entangled)\n\n"
+              << "Reduced density matrix rho_A:\n"
+              << "  [[" << rhoA[0][0].real() << ", " << rhoA[0][1].real() << "],\n"
+              << "   [" << rhoA[1][0].real() << ", " << rhoA[1][1].real() << "]]\n";
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV"))
+            particle.exportBellStateAnalysisCSV("bell_states.csv");
+    }
+    else if (mode == 1) {
+        static int bellIdx = 3;  // default Psi- (gives max violation)
+        ImGui::Combo("State", &bellIdx,
+                     "|Phi+>\0|Phi->\0|Psi+>\0|Psi->\0");
+
+        if (ImGui::Button("Compute")) {
+            QuantumParticle::TwoQubitState psi;
+            switch (bellIdx) {
+                case 0: psi = QuantumParticle::bellStatePhi(true);  break;
+                case 1: psi = QuantumParticle::bellStatePhi(false); break;
+                case 2: psi = QuantumParticle::bellStatePsi(true);  break;
+                case 3: psi = QuantumParticle::bellStatePsi(false); break;
+                default: psi = QuantumParticle::bellStatePsi(false); break;
+            }
+
+            // Sweep Bob angle, compute E(0, thetaB) and CHSH S
+            clearPlot();
+            int N = 200;
+            double thetaA = 0.0, thetaAp = M_PI / 4.0;
+            std::vector<double> angles(N), Ev(N), Sv(N);
+            for (int i = 0; i < N; ++i) {
+                double tB = M_PI * i / (N - 1);
+                double tBp = tB + M_PI / 4.0;
+                angles[i] = tB * 180.0 / M_PI;
+                Ev[i] = QuantumParticle::chshCorrelator(psi, thetaA, tB);
+                Sv[i] = QuantumParticle::chshS(psi, thetaA, thetaAp, tB, tBp);
+            }
+            addCurve("E(0, theta_B)", angles, Ev);
+            addCurve("CHSH S", angles, Sv);
+
+            // Add classical bound lines
+            std::vector<double> bound2(N, 2.0), boundm2(N, -2.0);
+            addCurve("S = +2 (classical)", angles, bound2);
+            addCurve("S = -2 (classical)", angles, boundm2);
+            plotTitle  = "CHSH Inequality";
+            plotXLabel = "Bob angle (deg)";
+            plotYLabel = "Value";
+
+            // Optimal CHSH: a=0, a'=pi/4, b=pi/8, b'=3pi/8 for Psi-
+            double optB = M_PI / 8.0, optBp = 3.0 * M_PI / 8.0;
+            double Sopt = QuantumParticle::chshS(psi, thetaA, thetaAp, optB, optBp);
+
+            std::ostringstream o;
+            o << "CHSH Bell Inequality: |S| <= 2 classically\n"
+              << "Quantum bound (Tsirelson): |S| <= 2*sqrt(2) = "
+              << 2.0 * sqrt(2.0) << "\n\n"
+              << "Optimal settings (a=0, a'=pi/4, b=pi/8, b'=3pi/8):\n"
+              << "  S = " << Sopt << "\n"
+              << "  |S| = " << fabs(Sopt) << "\n"
+              << (fabs(Sopt) > 2.0 ? "  >>> VIOLATES classical bound!\n" : "  Within classical bound.\n");
+            resultText = o.str();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Export CSV")) {
+            QuantumParticle::TwoQubitState psi;
+            switch (bellIdx) {
+                case 0: psi = QuantumParticle::bellStatePhi(true);  break;
+                case 1: psi = QuantumParticle::bellStatePhi(false); break;
+                case 2: psi = QuantumParticle::bellStatePsi(true);  break;
+                case 3: psi = QuantumParticle::bellStatePsi(false); break;
+                default: psi = QuantumParticle::bellStatePsi(false); break;
+            }
+            particle.exportCHSHSweepCSV("chsh_sweep.csv", psi, 200);
+        }
+    }
+    else {
+        static double a_re = 1.0, a_im = 0.0;
+        static double b_re = 0.0, b_im = 0.0;
+        static double c_re = 0.0, c_im = 0.0;
+        static double d_re = 1.0, d_im = 0.0;
+        ImGui::Text("State: a|00> + b|01> + c|10> + d|11>");
+        ImGui::InputDouble("Re(a)", &a_re, 0, 0, "%.4f");
+        ImGui::InputDouble("Im(a)", &a_im, 0, 0, "%.4f");
+        ImGui::InputDouble("Re(b)", &b_re, 0, 0, "%.4f");
+        ImGui::InputDouble("Im(b)", &b_im, 0, 0, "%.4f");
+        ImGui::InputDouble("Re(c)", &c_re, 0, 0, "%.4f");
+        ImGui::InputDouble("Im(c)", &c_im, 0, 0, "%.4f");
+        ImGui::InputDouble("Re(d)", &d_re, 0, 0, "%.4f");
+        ImGui::InputDouble("Im(d)", &d_im, 0, 0, "%.4f");
+
+        if (ImGui::Button("Compute")) {
+            QuantumParticle::TwoQubitState psi = {{
+                {a_re, a_im}, {b_re, b_im}, {c_re, c_im}, {d_re, d_im}
+            }};
+
+            // Normalize
+            double norm2 = 0;
+            for (auto& c : psi) norm2 += std::norm(c);
+            double inv = 1.0 / sqrt(norm2);
+            for (auto& c : psi) c *= inv;
+
+            auto rho = QuantumParticle::densityMatrixFromState(psi);
+            auto rhoA = QuantumParticle::partialTraceB(rho);
+            double C = QuantumParticle::concurrence(psi);
+            double SA = QuantumParticle::vonNeumannEntropy2x2(rhoA);
+
+            // Plot concurrence vs mixing: interpolate from current to |00>
+            clearPlot();
+            int N = 200;
+            std::vector<double> tv(N), cv(N), sv(N);
+            QuantumParticle::TwoQubitState sep = {{ {1,0},{0,0},{0,0},{0,0} }};
+            for (int i = 0; i < N; ++i) {
+                double t = (double)i / (N - 1);
+                QuantumParticle::TwoQubitState mixed;
+                double n2 = 0;
+                for (int k = 0; k < 4; ++k) {
+                    mixed[k] = (1.0 - t) * psi[k] + t * sep[k];
+                    n2 += std::norm(mixed[k]);
+                }
+                double invN = 1.0 / sqrt(n2);
+                for (auto& cc : mixed) cc *= invN;
+                tv[i] = t;
+                cv[i] = QuantumParticle::concurrence(mixed);
+                auto rr = QuantumParticle::densityMatrixFromState(mixed);
+                auto rrA = QuantumParticle::partialTraceB(rr);
+                sv[i] = QuantumParticle::vonNeumannEntropy2x2(rrA);
+            }
+            addCurve("Concurrence", tv, cv);
+            addCurve("Entropy S_A", tv, sv);
+            plotTitle  = "Entanglement vs Mixing (toward |00>)";
+            plotXLabel = "Mixing parameter t";
+            plotYLabel = "Value";
+
+            std::ostringstream o;
+            o << "Custom two-qubit state (normalized):\n"
+              << "  a = " << psi[0] << ", b = " << psi[1]
+              << ", c = " << psi[2] << ", d = " << psi[3] << "\n\n"
+              << "Concurrence C = " << C << "\n"
+              << "Entanglement entropy S_A = " << SA << " nats\n"
+              << "  (S_max = ln(2) = " << log(2.0) << ")\n\n"
+              << "Reduced rho_A:\n"
+              << "  [[" << rhoA[0][0] << ", " << rhoA[0][1] << "],\n"
+              << "   [" << rhoA[1][0] << ", " << rhoA[1][1] << "]]\n";
+            resultText = o.str();
         }
     }
 }
