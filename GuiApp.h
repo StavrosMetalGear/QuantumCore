@@ -79,4 +79,14 @@ private:
     void renderSim38_DensityOfStates();
     void renderSim39_CoherentSqueezed();
     void renderSim40_Entanglement();
+    void renderSim41_VariationalMethod();
+    void renderSim42_AdiabaticBerry();
+    void renderSim43_DensityMatrix();
+    void renderSim44_PathIntegral();
+    void renderSim45_QuantumGates();
+    void renderSim46_AharonovBohm();
+    void renderSim47_LandauLevels();
+    void renderSim48_HyperfineStructure();
+    void renderSim49_AlphaDecay();
+    void renderSim50_RelativisticQM();
 };

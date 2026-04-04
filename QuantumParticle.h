@@ -453,9 +453,513 @@ public:
     void exportCHSHSweepCSV(const std::string& filename,
         const TwoQubitState& psi, int numAngles);
 
+    // ===== 41: Variational Method =====
+    // Potential types for variational calculations:
+    //   0 = Harmonic oscillator (param1 = omega)
+    //   1 = Quartic (param1 = lambda, V = lambda*x^4)
+    //   2 = Linear (param1 = F, V = F|x|)
+    //   3 = Anharmonic HO (param1 = omega, param2 = lambda, V = mw^2x^2/2 + lambda*x^4)
+    //   4 = Double well (param1 = lambda, param2 = a, V = lambda*(x^2 - a^2)^2)
+
+    // Variational energy for Gaussian trial psi ~ exp(-alpha*x^2)
+    double variationalEnergyGaussian(double alpha, int potentialType,
+        double param1, double param2 = 0.0);
+
+    // Find optimal alpha via golden-section search
+    double variationalOptimalAlpha(int potentialType,
+        double param1, double param2 = 0.0,
+        double alphaMin = 1e-2, double alphaMax = 1e4, int iterations = 200);
+
+    // Rayleigh-Ritz: build Hamiltonian in HO basis, return lowest eigenvalues
+    std::vector<double> rayleighRitzHO(int basisSize, double omega,
+        int potentialType, double param1, double param2 = 0.0);
+
+    // Export variational sweep E(alpha) to CSV
+    void exportVariationalSweepCSV(const std::string& filename,
+        int potentialType, double param1, double param2, int numPoints);
+
+    // Export Rayleigh-Ritz convergence to CSV
+    void exportRayleighRitzCSV(const std::string& filename,
+        int maxBasisSize, double omega,
+        int potentialType, double param1, double param2);
+
+    // ===== 42: Adiabatic Approximation & Berry Phase =====
+    // Berry phase for spin-1/2 in a magnetic field tilted at angle theta
+    // from z-axis, slowly rotated through 2pi about z.
+    // gamma_+(theta) = -pi(1 - cos(theta))   [spin-up eigenstate]
+    static double berryPhaseSpinHalf(double theta);
+
+    // Solid angle subtended by the B-field path: Omega = 2pi(1 - cos(theta))
+    static double solidAngleCone(double theta);
+
+    // Landau-Zener transition probability at an avoided crossing.
+    // P_diabatic = exp(-2pi delta^2 / (hbar alpha))
+    // delta = half the minimum gap, alpha = dE/dt sweep rate (J/s)
+    static double landauZenerProbability(double delta, double alpha);
+
+    // Adiabatic condition parameter Q = hbar |dH/dt| / (Delta E)^2
+    // Q << 1 means evolution is adiabatic
+    static double adiabaticParameter(double gapEnergy, double couplingRate);
+
+    // Dynamic phase: phi_d = -E*t / hbar
+    static double dynamicPhase(double energy, double time);
+
+    // Berry phase for a general two-level system with Hamiltonian
+    //   H(R) = R (sin(theta)cos(phi), sin(theta)sin(phi), cos(theta)) . sigma
+    // traversing a closed loop at fixed theta with phi: 0 -> 2pi.
+    // gamma = -pi(1 - cos(theta))  [same formula, general result for two-level]
+    static double berryPhaseTwoLevel(double theta);
+
+    // Total phase (dynamic + geometric) for spin-1/2 in rotating field
+    // after one full cycle of period T
+    double totalPhaseSpinHalf(double B, double theta, double T);
+
+    void exportBerryPhaseCSV(const std::string& filename, int numPoints);
+    void exportLandauZenerCSV(const std::string& filename,
+        double delta, double alphaMax, int numPoints);
+    void exportAdiabaticSweepCSV(const std::string& filename,
+        double gapEnergy, double maxRate, int numPoints);
+
+    // ===== 43: Density Matrix & Decoherence =====
+    // Build 2x2 density matrix rho = |psi><psi| from spinor (alpha, beta)
+    static SpinMatrix densityMatrix2x2(std::complex<double> alpha, std::complex<double> beta);
+
+    // Mixed state: rho = p|up><up| + (1-p)|down><down|  (diagonal)
+    static SpinMatrix mixedStateDiagonal(double p);
+
+    // General 2x2 density matrix from Bloch vector (rx, ry, rz)
+    // rho = (I + r.sigma) / 2
+    static SpinMatrix densityMatrixFromBloch(double rx, double ry, double rz);
+
+    // Extract Bloch vector from 2x2 density matrix
+    static void blochVector(const SpinMatrix& rho, double& rx, double& ry, double& rz);
+
+    // Purity: Tr(rho^2), equals 1 for pure state, 1/2 for maximally mixed
+    static double purity2x2(const SpinMatrix& rho);
+
+    // Von Neumann entropy for 2x2 (already declared — reuse vonNeumannEntropy2x2)
+
+    // Fidelity between two 2x2 density matrices (for qubit states)
+    // F = Tr(sqrt(sqrt(rho1) rho2 sqrt(rho1)))^2
+    // For qubit: F = Tr(rho1*rho2) + 2*sqrt(det(rho1)*det(rho2))
+    static double fidelity2x2(const SpinMatrix& rho1, const SpinMatrix& rho2);
+
+    // ── Quantum Channels (Kraus operators applied to 2x2 density matrix) ──
+
+    // Amplitude damping: models T1 relaxation (energy decay)
+    // gamma = 1 - exp(-t/T1)
+    static SpinMatrix amplitudeDampingChannel(const SpinMatrix& rho, double gamma);
+
+    // Phase damping: models T2 dephasing (loss of coherence)
+    // lambda = 1 - exp(-t/T2)
+    static SpinMatrix phaseDampingChannel(const SpinMatrix& rho, double lambda);
+
+    // Depolarizing channel: rho -> (1-p)*rho + p*I/2
+    static SpinMatrix depolarizingChannel(const SpinMatrix& rho, double p);
+
+    // Combined T1/T2 evolution of Bloch vector (Bloch equations)
+    // Returns Bloch vector (rx, ry, rz) at time t given initial state
+    // dr/dt = -(rx/T2, ry/T2, (rz - rz_eq)/T1)
+    struct BlochEvolutionResult {
+        std::vector<double> times;
+        std::vector<double> rx, ry, rz;
+        std::vector<double> purity;
+    };
+    static BlochEvolutionResult blochEvolution(
+        double rx0, double ry0, double rz0,
+        double T1, double T2, double rz_eq,
+        double tMax, int numSteps);
+
+    // Export Bloch evolution to CSV
+    void exportBlochEvolutionCSV(const std::string& filename,
+        double rx0, double ry0, double rz0,
+        double T1, double T2, double rz_eq,
+        double tMax, int numSteps);
+
+    // Export channel comparison to CSV (apply all three channels vs parameter)
+    void exportQuantumChannelsCSV(const std::string& filename,
+        double rx0, double ry0, double rz0, int numPoints);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  44: PATH INTEGRAL FORMULATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Free-particle propagator K(xb, t; xa, 0)  — returns |K|^2
+    double freeParticlePropagatorMod2(double xa, double xb, double t);
+
+    // Full complex free-particle propagator
+    std::complex<double> freeParticlePropagator(double xa, double xb, double t);
+
+    // Harmonic oscillator propagator (Mehler kernel) — returns |K|^2
+    double hoPropagatorMod2(double xa, double xb, double t, double omega);
+
+    // Full complex HO propagator
+    std::complex<double> hoPropagator(double xa, double xb, double t, double omega);
+
+    // Classical action for free particle: S_cl = m(xb-xa)^2 / (2t)
+    double classicalActionFreeParticle(double xa, double xb, double t);
+
+    // Classical action for HO: S_cl = mw/(2 sin(wt)) * [(xa^2+xb^2)cos(wt) - 2 xa xb]
+    double classicalActionHO(double xa, double xb, double t, double omega);
+
+    // Classical path x_cl(tau) for free particle (straight line)
+    double classicalPathFreeParticle(double xa, double xb, double t, double tau);
+
+    // Classical path x_cl(tau) for HO
+    double classicalPathHO(double xa, double xb, double t, double omega, double tau);
+
+    // Discretized path integral for free particle (Monte-Carlo-like grid sum)
+    // Returns |K|^2 approximation using N time slices
+    double discretizedPathIntegralFree(double xa, double xb, double t,
+        int numSlices, int numGridPoints);
+
+    // Export |K(xb)|^2 vs xb for free particle
+    void exportFreeParticlePropagatorCSV(const std::string& filename,
+        double xa, double t, int numPoints);
+
+    // Export |K(xb)|^2 vs xb for HO
+    void exportHOPropagatorCSV(const std::string& filename,
+        double xa, double t, double omega, int numPoints);
+
+    // Export classical path x(tau) for both free and HO
+    void exportClassicalPathsCSV(const std::string& filename,
+        double xa, double xb, double t, double omega, int numPoints);
+
+    // Export path integral convergence: |K_N|^2 vs N for free particle
+    void exportPathIntegralConvergenceCSV(const std::string& filename,
+        double xa, double xb, double t, int maxSlices);
+
+    // ===== 45: QUANTUM GATES & CIRCUITS =====
+
+    // Single-qubit gates (return 2x2 unitary matrices)
+    static SpinMatrix gateIdentity();
+    static SpinMatrix gatePauliX();
+    static SpinMatrix gatePauliY();
+    static SpinMatrix gatePauliZ();
+    static SpinMatrix gateHadamard();
+    static SpinMatrix gatePhaseS();
+    static SpinMatrix gateTGate();
+    static SpinMatrix gateRx(double theta);
+    static SpinMatrix gateRy(double theta);
+    static SpinMatrix gateRz(double theta);
+
+    // Apply single-qubit gate to a spinor
+    static Spinor applyGateToSpinor(const SpinMatrix& gate, const Spinor& psi);
+
+    // Apply single-qubit gate to qubit 0 (A) or 1 (B) of a two-qubit state
+    static TwoQubitState applySingleQubitGate(const TwoQubitState& psi,
+        const SpinMatrix& gate, int qubit);
+
+    // Two-qubit gates
+    static TwoQubitState applyCNOT(const TwoQubitState& psi, int control, int target);
+    static TwoQubitState applySWAP(const TwoQubitState& psi);
+    static TwoQubitState applyCZ(const TwoQubitState& psi);
+
+    // Measurement: probability of outcome (0 or 1) on a qubit
+    static double measureQubitProb(const TwoQubitState& psi, int qubit, int outcome);
+
+    // Collapse state after measurement on a qubit with given outcome
+    static TwoQubitState collapseAfterMeasurement(const TwoQubitState& psi,
+        int qubit, int outcome);
+
+    // Bloch vector from single-qubit amplitudes
+    static void qubitBlochVector(std::complex<double> alpha, std::complex<double> beta,
+        double& rx, double& ry, double& rz);
+
+    // Export all standard gate matrices to CSV
+    void exportGateMatricesCSV(const std::string& filename);
+
+    // Export two-qubit state amplitudes and entanglement info
+    void exportTwoQubitStateCSV(const std::string& filename,
+        const TwoQubitState& state);
+
+    // ===== 46: AHARONOV-BOHM EFFECT =====
+
+    // AB phase shift for a charged particle encircling magnetic flux Phi:
+    // delta_phi = e * Phi / hbar  (returns phase in radians)
+    static double aharonovBohmPhase(double flux, double charge);
+
+    // Interference pattern for double-slit with AB flux between slits.
+    // Returns intensity I(theta) = |psi1 + psi2 * exp(i delta)|^2
+    // where delta = AB phase + geometric path difference
+    static double abInterference(double theta, double slitSep, double wavelength,
+        double abPhase);
+
+    // Magnetic flux quantum: Phi_0 = h / e
+    static double fluxQuantum();
+
+    // AB phase shift in units of Phi_0: delta = 2 pi Phi / Phi_0
+    static double abPhaseFromFluxRatio(double fluxRatio);
+
+    // Partial wave phase shifts for scattering off an AB flux tube
+    // delta_l = -pi * |l - alpha|  + pi * |l|  (mod 2pi), alpha = e*Phi/(2pi*hbar)
+    // Differential cross section for AB scattering (Aharonov-Bohm formula)
+    static double abScatteringCrossSection(double theta, double k, double alpha);
+
+    // Export interference pattern vs angle
+    void exportABInterferenceCSV(const std::string& filename,
+        double slitSep, double wavelength, double flux, int numPoints);
+
+    // Export AB scattering cross section vs angle
+    void exportABScatteringCSV(const std::string& filename,
+        double k, double alpha, int numPoints);
+
+    // Export interference vs flux (at a fixed observation angle)
+    void exportABFluxSweepCSV(const std::string& filename,
+        double slitSep, double wavelength, double theta, int numPoints);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  47: LANDAU LEVELS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Cyclotron frequency: omega_c = eB / m*
+    static double cyclotronFrequency(double B, double mStar);
+
+    // Magnetic length: l_B = sqrt(hbar / (eB))
+    static double magneticLength(double B);
+
+    // Landau level energy: E_n = hbar * omega_c * (n + 1/2)
+    static double landauLevelEnergy(int n, double B, double mStar);
+
+    // Landau level energy with spin (Zeeman splitting):
+    // E_{n,s} = hbar*omega_c*(n + 1/2) + g*mu_B*B*s,  s = ±1/2
+    static double landauLevelEnergyWithSpin(int n, double B, double mStar,
+        double gFactor, double spin);
+
+    // Degeneracy per unit area: N_phi = eB / h
+    static double landauDegeneracyPerArea(double B);
+
+    // Filling factor: nu = n_e / N_phi = n_e * h / (eB)
+    static double landauFillingFactor(double electronDensity, double B);
+
+    // Density of states with Landau levels (broadened with Lorentzian)
+    static double landauDOS(double E, double B, double mStar,
+        int maxN, double broadening);
+
+    // Hall conductivity (integer QHE): sigma_xy = nu * e^2 / h
+    static double hallConductivityIQHE(int nu);
+
+    // Hall resistance: R_H = h / (nu * e^2)
+    static double hallResistanceIQHE(int nu);
+
+    // Longitudinal resistance (simplified model): peaks between plateaux
+    static double longitudinalResistanceSHM(double B, double electronDensity,
+        double mStar, double broadening);
+
+    // Wavefunction of lowest Landau level (n=0, ky=0) in Landau gauge A=(0,Bx,0):
+    // psi_0(x) ~ exp(-x^2 / (4 l_B^2))
+    static double landauWavefunction(int n, double x, double B, double mStar);
+
+    // Export Landau level energy spectrum vs B
+    void exportLandauSpectrumCSV(const std::string& filename,
+        double mStar, double Bmax, int maxN, int numB);
+
+    // Export Landau DOS vs energy
+    void exportLandauDOSCSV(const std::string& filename,
+        double B, double mStar, double Emax, int maxN,
+        double broadening, int numE);
+
+    // Export quantum Hall effect (sigma_xy, R_H, R_xx vs B)
+    void exportQuantumHallCSV(const std::string& filename,
+        double electronDensity, double mStar, double Bmin, double Bmax,
+        double broadening, int numB);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  48: HYPERFINE STRUCTURE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    struct HyperfineLevel {
+        double F;       // total angular momentum quantum number
+        double mF;      // magnetic quantum number
+        double E;       // energy (J)
+    };
+
+    // Hyperfine splitting constant A for hydrogen-like s-states:
+    // A = (8/3) alpha^2 g_p (m_e/m_p) E_1 / n^3
+    static double hyperfineConstantA(int n, double Z, double gProton);
+
+    // Hyperfine energy: E_hf = (A/2) [F(F+1) - I(I+1) - J(J+1)]
+    static double hyperfineEnergy(double A_hf, double F, double I, double J);
+
+    // Hydrogen 21-cm line frequency (ground state F=1 -> F=0)
+    static double hydrogen21cmFrequency();
+
+    // Hydrogen 21-cm wavelength
+    static double hydrogen21cmWavelength();
+
+    // List all F values for given I and J: F = |I-J|, ..., I+J
+    static std::vector<double> listAllowedF(double I, double J);
+
+    // Landé g_F factor for hyperfine level:
+    // g_F = g_J [F(F+1) + J(J+1) - I(I+1)] / [2F(F+1)]
+    //     - (m_e/m_p) g_I [F(F+1) - J(J+1) + I(I+1)] / [2F(F+1)]
+    static double hyperfineGF(double F, double I, double J, double gJ, double gI);
+
+    // Weak-field Zeeman splitting of hyperfine levels:
+    // E = E_hf + g_F * mu_B * mF * B
+    static double hyperfineZeemanWeak(double E_hf, double gF, double mF, double B);
+
+    // Breit-Rabi formula for hydrogen ground state (I=1/2, J=1/2):
+    // E(F,mF,B) = -Delta_hf / (4(2I+1)) + g_I mu_N mF B
+    //             ± (Delta_hf/2) sqrt(1 + 2mF x / (I+1/2) + x^2)
+    // where x = (g_J - g_I(m_e/m_p)) mu_B B / Delta_hf
+    // + for F = I+1/2, - for F = I-1/2
+    static double breitRabiEnergy(double mF, bool upperLevel,
+        double I, double gJ, double gI,
+        double DeltaHF, double B);
+
+    // Compute all hyperfine+Zeeman levels for given I, J at field B
+    std::vector<HyperfineLevel> computeHyperfineLevels(
+        double I, double J, double A_hf, double gJ, double gI, double B);
+
+    // Compute Breit-Rabi levels for hydrogen ground state over a range of B
+    void exportBreitRabiCSV(const std::string& filename,
+        double DeltaHF, double I, double gJ, double gI,
+        double Bmax, int numB);
+
+    // Export hyperfine spectrum (energy levels vs quantum numbers)
+    void exportHyperfineSpectrumCSV(const std::string& filename,
+        double I, double J, double A_hf, double gJ, double gI);
+
+    // Export hyperfine Zeeman sweep (energy vs B)
+    void exportHyperfineZeemanCSV(const std::string& filename,
+        double I, double J, double A_hf, double gJ, double gI,
+        double Bmax, int numB);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  49: QUANTUM TUNNELING & ALPHA DECAY (GAMOW MODEL)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Gamow factor: G = (1/hbar) integral_{R}^{b} sqrt(2*mu*(V(r)-E)) dr
+    // V(r) = Z1*Z2*e^2 / (4*pi*eps0*r)  (Coulomb barrier)
+    // b = classical turning point where V(b) = E
+    static double gamowFactor(double E, double Z1, double Z2, double mu, double R);
+
+    // Coulomb barrier height at nuclear radius R
+    static double coulombBarrierHeight(double Z1, double Z2, double R);
+
+    // Nuclear radius estimate: R = r0 * A^{1/3}
+    static double nuclearRadius(int A, double r0 = 1.2e-15);
+
+    // Gamow energy: E_G = (2*pi*Z1*Z2*e^2/(4*pi*eps0))^2 * mu / (2*hbar^2)
+    //             = 2*mu*c^2 * (pi*alpha*Z1*Z2)^2
+    static double gamowEnergy(double Z1, double Z2, double mu);
+
+    // Tunneling probability through Coulomb barrier (Gamow):
+    // T ~ exp(-2*G) = exp(-sqrt(E_G / E) * pi)  (low-energy limit)
+    static double gamowTunnelingProb(double E, double Z1, double Z2, double mu, double R);
+
+    // Alpha decay half-life estimate:
+    // t_{1/2} = ln(2) / (f * T)
+    // f = v / (2*R) is the assault frequency, v = sqrt(2E/mu)
+    static double alphaDecayHalfLife(double E_alpha, int Z_parent, int A_parent);
+
+    // Geiger-Nuttall law: log10(t_{1/2}) = a / sqrt(E_alpha) + b
+    // Returns (log10(t_{1/2}), lambda decay constant)
+    static std::pair<double, double> geigerNuttall(double E_alpha, int Z_daughter);
+
+    // Sommerfeld parameter: eta = Z1*Z2*e^2 / (4*pi*eps0*hbar*v)
+    static double sommerfeldParameter(double E, double Z1, double Z2, double mu);
+
+    // Gamow peak energy for stellar nuclear reactions:
+    // E_0 = (b*kT/2)^{2/3} where b = sqrt(E_G) * pi
+    static double gamowPeakEnergy(double T_kelvin, double Z1, double Z2, double mu);
+
+    // Gamow window width:
+    // Delta = 4 * sqrt(E_0 * kT / 3)
+    static double gamowWindowWidth(double T_kelvin, double Z1, double Z2, double mu);
+
+    // Astrophysical S-factor cross section:
+    // sigma(E) = S(E) / E * exp(-sqrt(E_G/E))
+    static double crossSectionFromSFactor(double E, double S_factor,
+        double Z1, double Z2, double mu);
+
+    // Export Gamow tunneling probability vs energy
+    void exportGamowTunnelingCSV(const std::string& filename,
+        double Z1, double Z2, double mu, double R,
+        double Emax, int numE);
+
+    // Export alpha decay systematics (half-life vs Q-value)
+    void exportAlphaDecayCSV(const std::string& filename,
+        int Z_parent, int A_parent,
+        double Emin, double Emax, int numE);
+
+    // Export Gamow peak and window for stellar fusion
+    void exportGamowPeakCSV(const std::string& filename,
+        double Z1, double Z2, double mu,
+        double Tmin, double Tmax, int numT);
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    //  50: RELATIVISTIC QUANTUM MECHANICS (KLEIN-GORDON & DIRAC)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    // Relativistic energy-momentum relation: E = sqrt((pc)^2 + (mc^2)^2)
+    static double relativisticEnergy(double p, double m);
+
+    // Relativistic kinetic energy: T = E - mc^2
+    static double relativisticKineticEnergy(double p, double m);
+
+    // Compton wavelength: lambda_C = h / (mc)
+    static double comptonWavelength(double m);
+
+    // Reduced Compton wavelength: lambdaBar_C = hbar / (mc)
+    static double reducedComptonWavelength(double m);
+
+    // Klein-Gordon dispersion relation: omega = c * sqrt(k^2 + (mc/hbar)^2)
+    static double kleinGordonDispersion(double k, double m);
+
+    // Klein-Gordon group velocity: v_g = d(omega)/dk = c^2 k / omega
+    static double kleinGordonGroupVelocity(double k, double m);
+
+    // Klein-Gordon phase velocity: v_ph = omega / k
+    static double kleinGordonPhaseVelocity(double k, double m);
+
+    // Exact Dirac hydrogen energy levels:
+    // E_{nj} = mc^2 / sqrt(1 + (alpha*Z / (n - delta))^2)
+    // where delta = (j+1/2) - sqrt((j+1/2)^2 - (alpha*Z)^2)
+    static double diracHydrogenEnergy(int n, int l, double j, double Z);
+
+    // Dirac fine structure correction (difference from Bohr):
+    // Delta_E = E_Dirac - E_Bohr
+    static double diracFineStructureCorrection(int n, int l, double j, double Z);
+
+    // Klein paradox: transmission coefficient for Dirac particle at potential step
+    // V0 > E + mc^2 (superradiant regime)
+    static double kleinParadoxTransmission(double E, double V0, double m);
+
+    // Klein paradox: reflection coefficient
+    static double kleinParadoxReflection(double E, double V0, double m);
+
+    // Zitterbewegung frequency: omega_zb = 2mc^2 / hbar
+    static double zitterbewegungFrequency(double m);
+
+    // Zitterbewegung amplitude: A_zb = hbar / (2mc) = lambdaBar_C / 2
+    static double zitterbewegungAmplitude(double m);
+
+    // Relativistic density of states (3D):
+    // g(E) = E * sqrt(E^2 - (mc^2)^2) / (pi^2 (hbar c)^3)   for E > mc^2
+    static double relativisticDOS3D(double E, double m);
+
+    // De Broglie wavelength (relativistic): lambda = h / p
+    // where p = sqrt(E^2 - (mc^2)^2) / c for total energy E
+    static double relativisticDeBroglie(double kineticEnergy, double m);
+
+    // Spin-orbit coupling energy from Dirac theory (exact extraction)
+    // For comparison with perturbative result
+    static double diracSpinOrbitEnergy(int n, int l, double j, double Z);
+
+    // Export relativistic vs non-relativistic dispersion
+    void exportRelativisticDispersionCSV(const std::string& filename,
+        double m, double pMax, int numPoints);
+
+    // Export Dirac hydrogen spectrum comparison with Bohr
+    void exportDiracHydrogenCSV(const std::string& filename,
+        int maxN, double Z);
+
+    // Export Klein paradox transmission vs V0
+    void exportKleinParadoxCSV(const std::string& filename,
+        double E, double m, double V0max, int numPoints);
 };
-
-
 
 
 
