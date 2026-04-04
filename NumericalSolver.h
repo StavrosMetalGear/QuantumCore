@@ -1,9 +1,12 @@
 #pragma once
+
+#include "QuantumExport.h"
+
 #include <vector>
 #include <string>
 #include<complex>
 
-class NumericalSolver {
+class QUANTUM_API NumericalSolver {
 public:
     static void solveSchrodingerFDM(
         double mass,

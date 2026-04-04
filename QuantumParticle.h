@@ -1,5 +1,7 @@
 #pragma once
 
+#include "QuantumExport.h"
+
 #include <string>
 #include <vector>
 #include <complex>
@@ -10,7 +12,7 @@
 using SpinMatrix = std::array<std::array<std::complex<double>, 2>, 2>;
 using Spinor = std::array<std::complex<double>, 2>;
 
-class QuantumParticle {
+class QUANTUM_API QuantumParticle {
 public:
     std::string name;
     double mass;
@@ -98,8 +100,8 @@ public:
         int numK, int numEnergySamples, int maxBands);
 
     // Tight-binding model
-    double tightBindingEnergy(double E0, double t, double k, double a);
-    double tightBindingEffectiveMass(double t, double a);
+    static double tightBindingEnergy(double E0, double t, double k, double a);
+    static double tightBindingEffectiveMass(double t, double a);
     void exportTightBindingDispersionCSV(
         const std::string& filename, double E0, double t, double a, int numK);
 

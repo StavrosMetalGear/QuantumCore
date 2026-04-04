@@ -60,17 +60,43 @@ target_link_libraries(implot_lib PUBLIC imgui_lib)
 # ── Find OpenGL ──────────────────────────────────────────────────────────────
 find_package(OpenGL REQUIRED)
 
-# ── Source files ─────────────────────────────────────────────────────────────
-set(SOURCES
-    main.cpp
+# ── Physics library (no GUI dependencies) ────────────────────────────────────
+set(QUANTUM_LIB_SOURCES
     QuantumParticle.cpp
     NumericalSolver.cpp
+    quantum_c_api.cpp
+)
+
+set(QUANTUM_LIB_HEADERS
+    QuantumParticle.h
+    NumericalSolver.h
+    PhysicsConstants.h
+    QuantumExport.h
+    quantum_c_api.h
+)
+
+add_library(QuantumPhysics STATIC ${QUANTUM_LIB_SOURCES} ${QUANTUM_LIB_HEADERS})
+target_include_directories(QuantumPhysics PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(MSVC)
+    target_compile_definitions(QuantumPhysics PUBLIC _USE_MATH_DEFINES NOMINMAX)
+    target_compile_options(QuantumPhysics PRIVATE /W3)
+else()
+    target_compile_options(QuantumPhysics PRIVATE -Wall -Wextra -pedantic)
+endif()
+
+set_target_properties(QuantumPhysics PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
+# ── Source files (GUI application) ───────────────────────────────────────────
+set(SOURCES
+    main.cpp
     GuiApp.cpp
 )
 
 set(HEADERS
-    QuantumParticle.h
-    NumericalSolver.h
     GuiApp.h
 )
 
@@ -79,12 +105,11 @@ add_executable(QuantumCore ${SOURCES} ${HEADERS})
 
 # ── Include / link ───────────────────────────────────────────────────────────
 target_include_directories(QuantumCore PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(QuantumCore PRIVATE imgui_lib implot_lib OpenGL::GL)
+target_link_libraries(QuantumCore PRIVATE QuantumPhysics imgui_lib implot_lib OpenGL::GL)
 
-# ── Platform-specific settings ───────────────────────────────────────────────
+# ── Platform-specific settings (GUI executable) ─────────────────────────────
 if(MSVC)
     target_precompile_headers(QuantumCore PRIVATE pch.h)
-    target_compile_definitions(QuantumCore PRIVATE _USE_MATH_DEFINES NOMINMAX)
     target_compile_options(QuantumCore PRIVATE /W3)
 else()
     target_compile_options(QuantumCore PRIVATE -Wall -Wextra -pedantic)
