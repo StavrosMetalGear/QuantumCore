@@ -8,7 +8,7 @@
   2.  Running the Application
   3.  Class Reference: QuantumParticle
   4.  Class Reference: NumericalSolver
-  5.  Menu Options Reference
+  5.  Menu Options Reference (1-50)
   6.  Output Files
   7.  Visualization with Python
   8.  Extending the Project
@@ -20,44 +20,66 @@
 
   Prerequisites
   -------------
-  - Microsoft Visual Studio 2022 or later (C++17 support required).
-  - The Eigen header-only library is bundled in the repository under the
-    Eigen/ directory.  No separate installation is needed.
+  - CMake 3.15 or later.
+  - A C++17-capable compiler:
+      * Microsoft Visual Studio 2022 (MSVC) on Windows, or
+      * GCC / Clang on Linux / macOS.
+  - Internet access during the first configure (CMake FetchContent downloads
+    GLFW, Dear ImGui, and ImPlot automatically).
+  - The Eigen header-only library is bundled in the repository under Eigen/.
   - Python 3.x with pandas, numpy, and matplotlib (only for visualization).
 
-  Build Steps
-  -----------
-  1. Open  QuantumCore.sln  in Visual Studio.
-  2. Select the desired configuration (Debug / Release, x64).
-  3. Build the solution (Ctrl+Shift+B).
+  Build Steps (CMake / Ninja)
+  ---------------------------
+  1. Open the project folder in Visual Studio 2022 (File > Open > Folder)
+     or use the CMake command line:
 
-  The project uses a precompiled header (pch.h / framework.h).  All .cpp
-  files must include "pch.h" as their first directive.
+       cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
+       cmake --build build
+
+  2. Alternatively, open with Visual Studio's built-in CMake support:
+     VS will detect CMakeLists.txt and configure automatically.
+
+  3. The build produces two targets:
+       QuantumPhysics  -- static library (physics engine, no GUI)
+       QuantumCore     -- GUI executable (ImGui + ImPlot + GLFW + OpenGL)
+
+  Build System Details
+  --------------------
+  - Generator: Ninja (default), or any CMake-supported generator.
+  - C++ standard: C++17 (enforced via CMAKE_CXX_STANDARD 17).
+  - CMake version: 4.2.3-msvc3 (tested), minimum 3.15.
+  - Dependencies fetched via FetchContent:
+      * GLFW 3.4 (windowing / OpenGL context)
+      * Dear ImGui v1.91.8 (immediate-mode GUI)
+      * ImPlot v0.16 (2D plotting)
+  - On MSVC: precompiled header (pch.h) is used for QuantumCore;
+    _USE_MATH_DEFINES and NOMINMAX are defined.
 
 
 ================================================================================
 2.  RUNNING THE APPLICATION
 ================================================================================
 
-  Launch the compiled executable from Visual Studio or the command line.
-  The program presents an interactive menu:
+  Launch the compiled QuantumCore executable.  The application opens an
+  interactive GUI window with three panels:
 
-    1  - Infinite Square Well
-    2  - Harmonic Oscillator
-    3  - Finite Square Well
-    4  - Coulomb Potential
-    5  - Delta Potential Well
-    6  - Double Delta Potential Well
-    7  - Step Potential
-    8  - Square Potential Barrier
-    9  - Triangular Well Potential
-    10 - Parabolic Well
-    11 - Numerical Solver (Finite Difference Method)
-    12 - Time Evolution (Crank-Nicolson)
+    Left sidebar   -- Simulation selector (50 options).
+    Center panel   -- Parameter inputs, Compute / Export buttons, and
+                      theory collapsing headers.
+    Bottom panel   -- 2D plot area (ImPlot) showing computed results.
+    Text area      -- Numerical results and formatted output below the
+                      controls.
 
-  Enter the number of the desired potential and follow the on-screen
-  prompts to supply physical parameters.  Results are printed to the
-  console and exported to CSV files in the working directory.
+  Workflow:
+    1. Click a simulation in the left sidebar (e.g. "32  Full Hydrogen Atom").
+    2. Expand the "Theory: ..." header to read the physics background.
+    3. Select a mode from the dropdown (if available).
+    4. Adjust parameters with the input fields and sliders.
+    5. Click "Compute" to generate results and plots.
+    6. Click "Export CSV" to save data to a file in the working directory.
+
+  Default particle:  Electron (m = 9.1094e-31 kg, L = 1e-10 m, dim = 1).
 
 
 ================================================================================
@@ -73,176 +95,588 @@
 
       name      -- Human-readable label (e.g. "Electron").
       mass      -- Particle mass in kilograms.
-      length    -- Characteristic confinement length in meters (e.g. box
-                   width, well half-width).
-      dimension -- Spatial dimensionality (currently 1).
+      length    -- Characteristic confinement length in meters.
+      dimension -- Spatial dimensionality.
 
-  Data Members
+  Type Aliases
   ------------
-    string                     name
-    double                     mass
-    double                     length
-    int                        dimension
-    vector<complex<double>>    coefficients   (reserved for superposition states)
+    SpinMatrix      = std::array<std::array<std::complex<double>,2>,2>
+    Spinor          = std::array<std::complex<double>,2>
+    TwoQubitState   = std::array<std::complex<double>,4>
+    DensityMatrix4  = std::array<std::array<std::complex<double>,4>,4>
 
   ---------------------------------------------------------------------------
-  3.1  Infinite Square Well Methods
+  3.1  Infinite Square Well  (Option 1)
   ---------------------------------------------------------------------------
 
     double computeEnergy1DBox(int n)
-        Returns the energy of the n-th eigenstate (n >= 1) in Joules.
-        Formula:  E_n = n^2 pi^2 hbar^2 / (2 m L^2).
+        E_n = n^2 pi^2 hbar^2 / (2 m L^2).
 
     vector<double> computeWavefunction1DBox(int n, int numPoints)
-        Returns a vector of psi(x) sampled at numPoints equally spaced
-        points in [0, L].
+        psi_n(x) sampled at numPoints points in [0, L].
 
     complex<double> computeTimeDependentPsi1DBox(int n, double x, double t)
-        Returns the complex time-dependent wavefunction at position x and
-        time t for the n-th eigenstate.
+        Time-dependent wavefunction psi_n(x,t).
 
     vector<complex<double>> computeMomentumSpaceWavefunction1DBox(
                                 int n, int numPoints)
-        Computes the momentum-space wavefunction phi(p) by numerical
-        Fourier transform over 200 spatial grid points.  The momentum
-        range is [-1e-23, 1e-23] kg m/s.
+        Momentum-space wavefunction phi(p) via numerical Fourier transform.
 
     void exportWavefunctionCSV(string filename, int n, int numPoints)
-        Writes a CSV file with columns  x, psi  for the n-th eigenstate.
+        CSV: x, psi.
 
   ---------------------------------------------------------------------------
-  3.2  Harmonic Oscillator Methods
+  3.2  Harmonic Oscillator  (Option 2)
   ---------------------------------------------------------------------------
 
     double computeEnergy1DHarmonicOscillator(int n, double omega)
-        Returns E_n = hbar * omega * (n + 0.5).
-        NOTE: This method uses hbar = 1.0 (dimensionless units) for
-        compatibility with the FDM solver benchmarking mode.
+        E_n = hbar * omega * (n + 0.5).  Uses hbar = 1.0 for FDM
+        compatibility.
+
+    double hermitePolynomial(int n, double xi)
+        General Hermite polynomial H_n(xi) via recurrence.
 
     double computeHarmonicOscillatorPsi(int n, double x, double omega)
-        Returns psi_n(x) using Hermite polynomials (n = 0 or 1 only).
-        Uses SI hbar for the length scale alpha = m omega / hbar.
+        Full normalized HO wavefunction using Hermite polynomials.
 
-    void exportHarmonicOscillatorWavefunctionCSV(
-             string filename, int n, double omega, int numPoints)
-        Writes CSV with columns  x, psi  over [-1 nm, +1 nm].
+    void exportHarmonicOscillatorWavefunctionCSV(...)
+    pair<double,double> computeHOUncertainty(int n, double omega)
+        Dx = sqrt(hbar/(2mw)) * sqrt(2n+1), Dp similarly.
 
-  ---------------------------------------------------------------------------
-  3.3  Finite Square Well Methods
-  ---------------------------------------------------------------------------
-
-    double computeGroundStateEnergyFiniteSquareWell(double V0,
-                                                     int numIterations)
-        Finds the ground-state energy by bisection on the transcendental
-        equation  k tan(k a) = kappa,  where a = length/2.
-        V0 is the well depth in Joules; numIterations controls accuracy.
-
-    void exportFiniteSquareWellWavefunctionCSV(
-             string filename, double V0, double energy, int numPoints)
-        Writes the piecewise wavefunction (sinusoidal inside |x| <= a,
-        exponentially decaying outside) to CSV.
-
-    double computeFiniteSquareWellNormalization(
-               double V0, double energy, int numX)
-        Numerically integrates |psi|^2 over [-2a, 2a] and returns the
-        normalization constant 1/sqrt(integral).
-
-    void exportFiniteSquareWellTimeEvolutionCSV(
-             string filename, double V0, double energy,
-             int numX, int numT, double timeStep)
-        Placeholder for future time-dependent finite-well export.
+    double computeHOEnergyInField(int n, double omega, double E_field)
+    double computeHOShiftInField(double omega, double E_field)
+    void exportHOLadderMatrixCSV(string filename, int dim)
+    void exportHOWavefunctionsCSV(...)
 
   ---------------------------------------------------------------------------
-  3.4  Coulomb (Hydrogen-like) Potential Methods
+  3.3  Finite Square Well  (Option 3)
+  ---------------------------------------------------------------------------
+
+    double computeGroundStateEnergyFiniteSquareWell(double V0, int iters)
+        Bisection on k tan(ka) = kappa.
+
+    void exportFiniteSquareWellWavefunctionCSV(...)
+    double computeFiniteSquareWellNormalization(...)
+    void exportFiniteSquareWellTimeEvolutionCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.4  Coulomb Potential  (Option 4)
   ---------------------------------------------------------------------------
 
     double computeCoulombEnergy(int n, double Z)
-        Returns the Bohr energy level for principal quantum number n
-        and nuclear charge Z.  Uses SI constants.
-
     double computeCoulombRadialWavefunction(int n, double r, double Z)
-        Returns a simplified s-wave radial wavefunction R(r) for the
-        hydrogen-like atom.
-
-    void exportCoulombWavefunctionCSV(
-             string filename, int n, double Z, int numPoints)
-        Writes CSV with columns  r, psi  over [0, 0.5 nm].
-
-    void exportCoulombTimeEvolutionCSV(
-             string filename, int n, double Z,
-             int numR, int numT, double tMax)
-        Writes CSV with columns  r, t, RePsi, ImPsi, AbsPsi, Phase
-        for animated visualization of the stationary-state phase rotation.
+    void exportCoulombWavefunctionCSV(...)
+    void exportCoulombTimeEvolutionCSV(...)
 
   ---------------------------------------------------------------------------
-  3.5  Delta Potential Methods
+  3.5  Delta Potential  (Option 5)
   ---------------------------------------------------------------------------
 
     double computeDeltaPotentialEnergy(double V0)
-        Returns the single bound-state energy:
         E = -m^2 V0^2 / (2 hbar^2).
-
-    void exportDeltaPotentialWavefunctionCSV(
-             string filename, double V0, int numPoints)
-        Writes CSV with columns  x, psi  over [-1 nm, +1 nm].
-        Wavefunction:  psi(x) = sqrt(kappa) * exp(-kappa |x|).
+    void exportDeltaPotentialWavefunctionCSV(...)
 
   ---------------------------------------------------------------------------
-  3.6  Double Delta Potential Methods
+  3.6  Double Delta Potential  (Option 6)
   ---------------------------------------------------------------------------
 
     double computeDoubleDeltaEnergy(double V0, double a)
-        Returns an approximate symmetric bound-state energy.
-
-    void exportDoubleDeltaWavefunctionCSV(
-             string filename, double V0, double a, int numPoints)
-        Writes the symmetric superposition of two exponential decays
-        centered at x = +/- a.
+    void exportDoubleDeltaWavefunctionCSV(...)
 
   ---------------------------------------------------------------------------
-  3.7  Step Potential
+  3.7  Step Potential  (Option 7)
   ---------------------------------------------------------------------------
 
-    void exportStepPotentialWavefunctionCSV(
-             string filename, double E, double V0, int numPoints)
-        Writes the real part of the wavefunction for a particle of
-        energy E incident on a step of height V0.  Region x < 0 has
-        an oscillatory wave; x >= 0 has either an oscillatory
-        (E > V0) or decaying (E < V0) solution.
+    void exportStepPotentialWavefunctionCSV(string, double E, double V0, int)
 
   ---------------------------------------------------------------------------
-  3.8  Rectangular Barrier
+  3.8  Rectangular Barrier  (Option 8)
   ---------------------------------------------------------------------------
 
-    void exportBarrierWavefunctionCSV(
-             string filename, double E, double V0, double a,
-             int numPoints)
-        Writes the wavefunction for a particle incident on a barrier
-        of height V0 and half-width a.  Tunneling behavior is shown
-        for E < V0.
+    void exportBarrierWavefunctionCSV(string, double E, double V0, double a, int)
 
   ---------------------------------------------------------------------------
-  3.9  Triangular Well
+  3.9  Triangular Well  (Option 9)
   ---------------------------------------------------------------------------
 
-    void exportTriangularWellWavefunctionCSV(
-             string filename, double F, double energy, int numPoints)
-        Writes a semi-classical wavefunction approximation for a
-        linear (electric-field) confining potential V(x) = Fx.
+    void exportTriangularWellWavefunctionCSV(string, double F, double E, int)
 
   ---------------------------------------------------------------------------
-  3.10  Parabolic Well
+  3.10  Parabolic Well  (Option 10)
   ---------------------------------------------------------------------------
 
     double computeParabolicWellEnergy(int n, double omega)
-        Identical to the harmonic oscillator energy formula (SI units).
-
     double computeParabolicWellWavefunction(int n, double x, double omega)
-        Returns psi_n(x) for n = 0, 1 using Hermite polynomials (SI units).
+    void exportParabolicWellWavefunctionCSV(...)
 
-    void exportParabolicWellWavefunctionCSV(
-             string filename, int n, double omega, int numPoints)
-        Writes CSV over [-1 nm, +1 nm].
+  ---------------------------------------------------------------------------
+  3.11  Scattering Coefficients  (Option 13)
+  ---------------------------------------------------------------------------
+
+    pair<double,double> computeStepPotentialRT(E, V1, V2, mI, mII)
+    pair<double,double> computeDeltaScatteringRT(E, b)
+    pair<double,double> computeBarrierRT(E, V0, a)
+        Returns (R, T) reflection and transmission coefficients.
+
+  ---------------------------------------------------------------------------
+  3.12  Kronig-Penney Model  (Option 14)
+  ---------------------------------------------------------------------------
+
+    double kronigPenneyDispersion(E, V0, a, b)
+    double kronigPenneyDeltaDispersion(E, Pprime, a)
+    vector<pair<double,double>> computeKronigPenneyBands(...)
+    void exportKronigPenneyBandsCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.13  Tight-Binding Model  (Option 15)
+  ---------------------------------------------------------------------------
+
+    double tightBindingEnergy(E0, t, k, a)
+        E(k) = E0 - 2t cos(ka).
+    double tightBindingEffectiveMass(t, a)
+    void exportTightBindingDispersionCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.14  2D Box  (Option 17)
+  ---------------------------------------------------------------------------
+
+    double computeEnergy2DBox(nx, ny, a, b)
+    void exportWavefunction2DBoxCSV(...)
+    vector<tuple<int,int,double>> listEnergyLevels2DBox(L, maxN)
+    void exportEnergyLevels2DBoxCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.15  3D Box  (Option 18)
+  ---------------------------------------------------------------------------
+
+    double computeEnergy3DBox(nx, ny, nz, a, b, c)
+    void exportWavefunction3DBoxSliceCSV(...)
+    vector<tuple<int,int,int,double>> listEnergyLevels3DBox(L, maxN)
+    void exportEnergyLevels3DBoxCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.16  Quantum Well / Wire / Dot  (Option 19)
+  ---------------------------------------------------------------------------
+
+    double computeQuantumWellEnergy(n, Lz, mStar, kx, ky)
+    double computeQuantumWireEnergy(ny, nz, Ly, Lz, mStar, kx)
+    double computeQuantumDotEnergy(nx, ny, nz, Lx, Ly, Lz, mStar)
+    double computeQuantumDotHOEnergy(nx, ny, nz, omegaX, omegaY, omegaZ, mStar)
+    void exportQuantumWellSubbandsCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.17  Central Potential & Spherical Harmonics  (Option 20)
+  ---------------------------------------------------------------------------
+
+    double associatedLegendre(int l, int m, double x)
+    complex<double> sphericalHarmonic(int l, int m, double theta, double phi)
+    double computeEffectivePotential(r, l, Vr)
+    void exportEffectivePotentialCSV(...)
+    void exportSphericalHarmonicsCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.18  Spherical Infinite Well  (Option 21)
+  ---------------------------------------------------------------------------
+
+    double sphericalBesselJ(int l, double x)
+    double findBesselZero(int l, int n)
+    double computeSphericalWellEnergy(n, l, a)
+    void exportSphericalWellWavefunctionCSV(...)
+    void exportSphericalWellEnergyLevelsCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.19  Two-Body Problem  (Option 22)
+  ---------------------------------------------------------------------------
+
+    double computeReducedMass(m1, m2)
+    double computeTwoBodyCoulombEnergy(m1, m2, n, Z)
+    void exportTwoBodyComparisonCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.20  Orbital Angular Momentum  (Option 23)
+  ---------------------------------------------------------------------------
+
+    double ladderCoefficient(l, m, raising)
+    void exportOrbitalAngularMomentumCSV(...)
+    void exportLadderOperatorActionCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.21  Spin-1/2 System  (Option 24)
+  ---------------------------------------------------------------------------
+
+    SpinMatrix pauliX(), pauliY(), pauliZ()
+    SpinMatrix spinOperator(char component)
+    SpinMatrix spinRaising(), spinLowering()
+    Spinor eigenstateSpin(char axis, bool plus)
+    tuple<double,double,double> computeSpinExpectation(alpha, beta)
+    SpinMatrix multiplySpinMatrices(A, B)
+    void exportPauliMatricesCSV(...)
+    void exportSpinAnalysisCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.22  Addition of Angular Momentum  (Option 25)
+  ---------------------------------------------------------------------------
+
+    double factorial(int n)
+    vector<double> listAllowedJ(j1, j2)
+    double clebschGordan(j1, m1, j2, m2, J, M)
+    void exportCoupledStatesCSV(...)
+    void exportSingletTripletCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.23  Non-Degenerate Perturbation Theory  (Option 26)
+  ---------------------------------------------------------------------------
+
+    double matrixElementISW(m, n)
+    double starkISWFirstOrder(n, electricField)
+    double starkISWSecondOrder(n, electricField, maxTerms)
+    double starkHOSecondOrder(electricField, m, omega)
+    pair<double,double> twoLevelPerturbation(delta, Omega)
+    pair<double,double> twoLevelExact(delta, Omega)
+    void exportStarkISWCSV(...), exportStarkHOCSV(...),
+         exportTwoLevelComparisonCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.24  Degenerate Perturbation Theory  (Option 27)
+  ---------------------------------------------------------------------------
+
+    pair<double,double> degenerateTwoLevel(E0, Omega)
+    pair<double,double> diagonalize2x2(H11, H22, H12)
+    void exportDegenerateTwoLevelCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.25  Identical Particles  (Option 28)
+  ---------------------------------------------------------------------------
+
+    double twoParticleISW(nA, nB, x1, x2, symmetric)
+    void exportTwoParticleISWCSV(...)
+    double determinantNxN(matrix, n)
+    double slaterDeterminantISW(orbitals, positions)
+    double freeElectronGroundStateEnergy(numElectrons)
+    pair<double,double> freeElectronTransition(numElectrons)
+    void exportFreeElectronModelCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.26  Helium & Variational  (Option 29)
+  ---------------------------------------------------------------------------
+
+    double heliumUnperturbedEnergy()       -- -4 Hartree
+    double heliumFirstOrderCorrection()    -- (5/4) Hartree
+    double heliumVariationalEnergy(lambda)
+    double heliumOptimalLambda()           -- 27/16
+    void exportHeliumVariationalCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.27  WKB Approximation  (Option 30)
+  ---------------------------------------------------------------------------
+
+    double wkbBohrSommerfeld(V, param, xMin, xMax, n, numPts)
+    double wkbTunnelingProbability(V, param, x1, x2, E, numPts)
+    double wkbEnergyHarmonicOscillator(n, omega)
+    double wkbEnergyLinearPotential(n, F)
+    double wkbTunnelingBarrier(E, V0, a)
+    void exportWKBComparisonCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.28  Time-Dependent Perturbation Theory  (Option 31)
+  ---------------------------------------------------------------------------
+
+    double transitionProbSinusoidal(Vfi, omega, omega0, t)
+    double fermiGoldenRuleRate(Vfi, densityOfStates)
+    double rabiProbability(Omega_R, delta, t)
+    void exportTransitionProbCSV(...), exportRabiCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.29  Full Hydrogen Atom  (Option 32)
+  ---------------------------------------------------------------------------
+
+    double associatedLaguerre(p, k, x)
+    double hydrogenRadialWavefunction(n, l, r, Z)
+    double hydrogenProbabilityDensity(n, l, m, r, theta, Z)
+    HydrogenExpectationValues hydrogenExpectations(n, l, Z)
+        Struct: r_avg, r2_avg, inv_r_avg, inv_r2_avg.
+    void exportHydrogenRadialCSV(...), exportHydrogenProbabilityCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.30  Fine Structure  (Option 33)
+  ---------------------------------------------------------------------------
+
+    struct FineStructureResult {
+        E_Bohr, E_relativistic, E_spinOrbit, E_Darwin, E_total
+    };
+    FineStructureResult computeFineStructure(n, l, j, Z)
+    double lambShift_n2()   -- 1057.845 MHz
+    void exportFineStructureCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.31  Zeeman Effect  (Option 34)
+  ---------------------------------------------------------------------------
+
+    struct ZeemanLevel { n, l, j, mj, g_j, E_noField, E_withField };
+    double landeGFactor(l, s, j)
+    vector<ZeemanLevel> computeZeemanLevels(n, Z, B)
+    vector<ZeemanLevel> computePaschenBackLevels(n, Z, B)
+    void exportZeemanCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.32  Partial Wave Analysis  (Option 35)
+  ---------------------------------------------------------------------------
+
+    double sphericalNeumannN(int l, double x)
+    double phaseShiftHardSphere(l, k, a)
+    double phaseShiftFiniteWell(l, E, V0, a)
+    double partialWaveCrossSection(l, k, delta_l)
+    double totalCrossSection(E, V0, a, lMax)
+    double differentialCrossSection(E, V0, a, lMax, theta)
+    void exportPartialWaveCSV(...), exportDifferentialCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.33  Born Approximation  (Option 36)
+  ---------------------------------------------------------------------------
+
+    double bornAmplitudeSphericalWell(q, V0, a, m)
+    double bornAmplitudeYukawa(q, V0, mu, m)
+    double bornAmplitudeCoulomb(q, Z, m, screening)
+    double bornTotalCrossSectionSphericalWell(k, V0, a, m)
+    void exportBornDifferentialCSV(...), exportBornVsExactCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.34  Transfer Matrix Method  (Option 37)
+  ---------------------------------------------------------------------------
+
+    struct TransferMatrixResult { T, R };
+    void transferMatrixLayer(k, kp, width, M[2][2])
+    TransferMatrixResult transferMatrixMultilayer(E, widths, heights)
+    TransferMatrixResult resonantTunnelingDoubleBarrier(E, V0, bw, ww)
+    void exportTransferMatrixCSV(...), exportResonantTunnelingCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.35  Density of States  (Option 38)
+  ---------------------------------------------------------------------------
+
+    static double dos1D(E, m)       -- g(E) ~ 1/sqrt(E)
+    static double dos2D(m)          -- constant
+    static double dos3D(E, m)       -- g(E) ~ sqrt(E)
+    double dosBox1D(E, L, maxN, broadening)
+    double dosQuantumWell2DEG(E, Lz, m, maxSubbands)
+    void exportDOSFreeCSV(...), exportDOSQuantumWellCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.36  Coherent & Squeezed States  (Option 39)
+  ---------------------------------------------------------------------------
+
+    static double coherentStatePhotonProb(alphaMag, n)  -- Poisson
+    static double coherentStateMeanN(alphaMag)
+    static double coherentStateVarianceN(alphaMag)
+    double coherentStateWavefunction(alpha_r, alpha_i, x, omega, t)
+    double wignerFunctionCoherent(alpha_r, alpha_i, x, p, omega)
+    double squeezedUncertaintyX(r, omega, m)
+    double squeezedUncertaintyP(r, omega, m)
+    void exportCoherentStateCSV(...), exportWignerCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.37  Quantum Entanglement & Bell States  (Option 40)
+  ---------------------------------------------------------------------------
+
+    TwoQubitState bellStatePhi(bool plus), bellStatePsi(bool plus)
+    DensityMatrix4 densityMatrixFromState(psi)
+    SpinMatrix partialTraceB(rho), partialTraceA(rho)
+    double vonNeumannEntropy2x2(rho)
+    double concurrence(psi)
+    double chshCorrelator(psi, thetaA, thetaB)
+    double chshS(psi, thetaA, thetaAp, thetaB, thetaBp)
+    double measurementProb(psi, outcomeA, outcomeB, thetaA, thetaB)
+    void exportBellStateAnalysisCSV(...), exportCHSHSweepCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.38  Variational Method  (Option 41)
+  ---------------------------------------------------------------------------
+
+    double variationalEnergyGaussian(alpha, potentialType, p1, p2)
+        Potential types: 0=HO, 1=quartic, 2=linear, 3=anharmonic, 4=double well.
+    double variationalOptimalAlpha(...)
+    vector<double> rayleighRitzHO(basisSize, omega, potType, p1, p2)
+        Jacobi eigenvalue solver for Rayleigh-Ritz in HO basis.
+    void exportVariationalSweepCSV(...), exportRayleighRitzCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.39  Adiabatic Approximation & Berry Phase  (Option 42)
+  ---------------------------------------------------------------------------
+
+    double berryPhaseSpinHalf(theta)      -- gamma = -pi(1 - cos theta)
+    double solidAngleCone(theta)
+    double landauZenerProbability(delta, alpha)
+    double adiabaticParameter(gapEnergy, couplingRate)
+    double dynamicPhase(energy, time)
+    double berryPhaseTwoLevel(theta)
+    double totalPhaseSpinHalf(B, theta, T)
+    void exportBerryPhaseCSV(...), exportLandauZenerCSV(...),
+         exportAdiabaticSweepCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.40  Density Matrix & Decoherence  (Option 43)
+  ---------------------------------------------------------------------------
+
+    SpinMatrix densityMatrix2x2(alpha, beta)
+    SpinMatrix mixedStateDiagonal(p)
+    SpinMatrix densityMatrixFromBloch(rx, ry, rz)
+    void blochVector(rho, rx, ry, rz)
+    double purity2x2(rho), fidelity2x2(rho1, rho2)
+    SpinMatrix amplitudeDampingChannel(rho, gamma)    -- T1 relaxation
+    SpinMatrix phaseDampingChannel(rho, lambda)       -- T2 dephasing
+    SpinMatrix depolarizingChannel(rho, p)
+    struct BlochEvolutionResult { times, rx, ry, rz, purity };
+    BlochEvolutionResult blochEvolution(rx0,ry0,rz0, T1,T2, rz_eq, tMax,N)
+    void exportBlochEvolutionCSV(...), exportQuantumChannelsCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.41  Path Integral Formulation  (Option 44)
+  ---------------------------------------------------------------------------
+
+    complex<double> freeParticlePropagator(xa, xb, t)
+    double freeParticlePropagatorMod2(xa, xb, t)
+    complex<double> hoPropagator(xa, xb, t, omega)     -- Mehler kernel
+    double classicalActionFreeParticle(xa, xb, t)
+    double classicalActionHO(xa, xb, t, omega)
+    double classicalPathFreeParticle(xa, xb, t, tau)
+    double classicalPathHO(xa, xb, t, omega, tau)
+    double discretizedPathIntegralFree(xa, xb, t, numSlices, numGrid)
+    void exportFreeParticlePropagatorCSV(...), exportHOPropagatorCSV(...),
+         exportClassicalPathsCSV(...), exportPathIntegralConvergenceCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.42  Quantum Gates & Circuits  (Option 45)
+  ---------------------------------------------------------------------------
+
+    SpinMatrix gateIdentity(), gatePauliX(), gatePauliY(), gatePauliZ()
+    SpinMatrix gateHadamard(), gatePhaseS(), gateTGate()
+    SpinMatrix gateRx(theta), gateRy(theta), gateRz(theta)
+    Spinor applyGateToSpinor(gate, psi)
+    TwoQubitState applySingleQubitGate(psi, gate, qubit)
+    TwoQubitState applyCNOT(psi, control, target)
+    TwoQubitState applySWAP(psi), applyCZ(psi)
+    double measureQubitProb(psi, qubit, outcome)
+    TwoQubitState collapseAfterMeasurement(psi, qubit, outcome)
+    void qubitBlochVector(alpha, beta, rx, ry, rz)
+    void exportGateMatricesCSV(...), exportTwoQubitStateCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.43  Aharonov-Bohm Effect  (Option 46)
+  ---------------------------------------------------------------------------
+
+    double aharonovBohmPhase(flux, charge)
+    double fluxQuantum()                     -- Phi_0 = h/e
+    double abPhaseFromFluxRatio(fluxRatio)
+    double abInterference(theta, slitSep, wavelength, abPhase)
+    double abScatteringCrossSection(theta, k, alpha)
+    void exportABInterferenceCSV(...), exportABScatteringCSV(...),
+         exportABFluxSweepCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.44  Landau Levels  (Option 47)
+  ---------------------------------------------------------------------------
+
+    double cyclotronFrequency(B, mStar)
+    double magneticLength(B)
+    double landauLevelEnergy(n, B, mStar)
+    double landauLevelEnergyWithSpin(n, B, mStar, gFactor, spin)
+    double landauDegeneracyPerArea(B)
+    double landauFillingFactor(electronDensity, B)
+    double landauDOS(E, B, mStar, maxN, broadening)
+    double hallConductivityIQHE(nu)
+    double hallResistanceIQHE(nu)
+    double longitudinalResistanceSHM(B, nDens, mStar, broadening)
+    double landauWavefunction(n, x, B, mStar)
+    void exportLandauSpectrumCSV(...), exportLandauDOSCSV(...),
+         exportQuantumHallCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.45  Hyperfine Structure  (Option 48)
+  ---------------------------------------------------------------------------
+
+    double hyperfineConstantA(n, Z, gProton)
+    double hyperfineEnergy(A_hf, F, I, J)
+    double hydrogen21cmFrequency()          -- 1420.406 MHz
+    double hydrogen21cmWavelength()         -- 21.1 cm
+    vector<double> listAllowedF(I, J)
+    double hyperfineGF(F, I, J, gJ, gI)
+    double hyperfineZeemanWeak(E_hf, gF, mF, B)
+    double breitRabiEnergy(mF, upper, I, gJ, gI, Delta, B)
+    struct HyperfineLevel { F, mF, E };
+    vector<HyperfineLevel> computeHyperfineLevels(I, J, A, gJ, gI, B)
+    void exportBreitRabiCSV(...), exportHyperfineSpectrumCSV(...),
+         exportHyperfineZeemanCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.46  Quantum Tunneling & Alpha Decay (Gamow Model)  (Option 49)
+  ---------------------------------------------------------------------------
+
+    double gamowFactor(E, Z1, Z2, mu, R)
+    double coulombBarrierHeight(Z1, Z2, R)
+    double nuclearRadius(A, r0=1.2e-15)
+    double gamowEnergy(Z1, Z2, mu)
+    double gamowTunnelingProb(E, Z1, Z2, mu, R)
+    double alphaDecayHalfLife(E_alpha, Z_parent, A_parent)
+    pair<double,double> geigerNuttall(E_alpha, Z_daughter)
+    double sommerfeldParameter(E, Z1, Z2, mu)
+    double gamowPeakEnergy(T_kelvin, Z1, Z2, mu)
+    double gamowWindowWidth(T_kelvin, Z1, Z2, mu)
+    double crossSectionFromSFactor(E, S, Z1, Z2, mu)
+    void exportGamowTunnelingCSV(...), exportAlphaDecayCSV(...),
+         exportGamowPeakCSV(...)
+
+  ---------------------------------------------------------------------------
+  3.47  Relativistic Quantum Mechanics  (Option 50)
+  ---------------------------------------------------------------------------
+
+    static double relativisticEnergy(p, m)
+        E = sqrt((pc)^2 + (mc^2)^2).
+
+    static double relativisticKineticEnergy(p, m)
+        T = E - mc^2.
+
+    static double comptonWavelength(m)
+        lambda_C = h/(mc).  Electron: 2.426 pm.
+
+    static double reducedComptonWavelength(m)
+        lambdaBar_C = hbar/(mc).
+
+    static double kleinGordonDispersion(k, m)
+        omega = c * sqrt(k^2 + (mc/hbar)^2).
+
+    static double kleinGordonGroupVelocity(k, m)
+        v_g = c^2 k / omega.  Always < c.
+
+    static double kleinGordonPhaseVelocity(k, m)
+        v_ph = omega / k.  Always > c.
+
+    static double diracHydrogenEnergy(n, l, j, Z)
+        Exact Dirac formula for hydrogen-like atoms:
+        E_{nj} = mc^2 / sqrt(1 + (alpha*Z/(n - delta))^2)
+        where delta = (j+1/2) - sqrt((j+1/2)^2 - (alpha*Z)^2).
+
+    static double diracFineStructureCorrection(n, l, j, Z)
+        Delta_E = E_Dirac - E_Bohr.
+
+    static double kleinParadoxTransmission(E, V0, m)
+        Three regimes: normal (V0 < E-mc^2), evanescent, Klein paradox
+        (V0 > E+mc^2, pair creation).
+
+    static double kleinParadoxReflection(E, V0, m)
+
+    static double zitterbewegungFrequency(m)
+        omega_zb = 2mc^2/hbar.  Electron: ~1.55e21 rad/s.
+
+    static double zitterbewegungAmplitude(m)
+        A_zb = hbar/(2mc).  Electron: ~0.19 fm.
+
+    static double relativisticDOS3D(E, m)
+    static double relativisticDeBroglie(kineticEnergy, m)
+    static double diracSpinOrbitEnergy(n, l, j, Z)
+
+    void exportRelativisticDispersionCSV(...)
+    void exportDiracHydrogenCSV(...)
+    void exportKleinParadoxCSV(...)
 
 
 ================================================================================
@@ -255,123 +689,113 @@
   All methods are static.
 
   ---------------------------------------------------------------------------
-  4.1  Finite-Difference Eigenvalue Solver
+  4.1  Finite-Difference Eigenvalue Solver  (Option 11)
   ---------------------------------------------------------------------------
 
     static void solveSchrodingerFDM(
-        double mass,
-        double xMin,
-        double xMax,
-        int    numPoints,
-        const vector<double>& potential,
-        int    numEigenstates,
-        const string& outputFilename
-    )
+        double mass, double xMin, double xMax, int numPoints,
+        const vector<double>& potential, int numEigenstates,
+        const string& outputFilename)
 
     Discretizes the time-independent Schrodinger equation on a uniform
-    grid of numPoints between xMin and xMax.  The potential vector must
-    have exactly numPoints entries.
-
-    Uses the Eigen SelfAdjointEigenSolver to diagonalize the resulting
+    grid.  Uses the Eigen SelfAdjointEigenSolver to diagonalize the
     Hamiltonian matrix.
 
     Outputs:
       - <outputFilename>   : CSV with columns  x, psi0, psi1, ...
       - fdm_energies.csv   : CSV with columns  index, energy_J
 
-    The solver currently operates in dimensionless units (hbar = 1,
-    mass = 1) for the FDM path.  Pass mass = 1.0 from the caller.
-
-    Supported user-defined potentials (from the main menu):
-      1) Finite well:     V = 0 inside |x| <= a, V0 outside
-      2) Double well:     two finite wells centered at +/- d
-      3) Gaussian well:   V = V0 * exp(-(x/sigma)^2)
-      4) Quartic:         V = lambda * x^4
-      5) Harmonic:        V = 0.5 * omega^2 * x^2  (benchmarked against
-                           analytical results)
+    Supported potentials (via GUI):
+      1) Finite well       2) Double well       3) Gaussian well
+      4) Quartic           5) Harmonic (benchmark)
 
   ---------------------------------------------------------------------------
-  4.2  Crank-Nicolson Time Evolution
+  4.2  Crank-Nicolson Time Evolution  (Option 12)
   ---------------------------------------------------------------------------
 
     static void timeEvolveCrankNicolson(
-        double mass,
-        double xMin,
-        double xMax,
-        int    numPoints,
-        const vector<double>&          V,
-        const vector<complex<double>>& psi0,
-        double dt,
-        int    numSteps,
-        const string& outCsv,
-        int    snapshotEvery = 10
-    )
+        double mass, double xMin, double xMax, int numPoints,
+        const vector<double>& V, const vector<complex<double>>& psi0,
+        double dt, int numSteps, const string& outCsv,
+        int snapshotEvery = 10)
 
-    Propagates the initial state psi0 forward in time under the
-    potential V using the Crank-Nicolson implicit scheme.
-
-    The Hamiltonian is built as a sparse matrix; the LU factorization
-    is performed once and reused for all time steps.  Dirichlet boundary
-    conditions (psi = 0 at endpoints) are enforced.
-
-    Output CSV columns:  x, t, RePsi, ImPsi, AbsPsi, Phase
-    A snapshot is written every snapshotEvery steps.
-
-    Parameters:
-      mass          -- particle mass (kg, SI)
-      xMin, xMax    -- spatial domain
-      numPoints     -- number of grid points
-      V             -- potential array (size numPoints)
-      psi0          -- initial complex wavefunction (size numPoints)
-      dt            -- time step in seconds
-      numSteps      -- total number of time steps
-      outCsv        -- output CSV filename
-      snapshotEvery -- interval between saved snapshots
+    Implicit Crank-Nicolson propagation with Dirichlet BCs.
+    Output CSV columns:  x, t, RePsi, ImPsi, AbsPsi, Phase.
 
   ---------------------------------------------------------------------------
   4.3  Gaussian Initial State
   ---------------------------------------------------------------------------
 
     static vector<complex<double>> makeGaussianInitial(
-        int    numPoints,
-        double xMin,
-        double xMax,
-        double x0,
-        double sigma,
-        double k0
-    )
-
-    Constructs a normalized Gaussian wave packet:
-      psi(x, 0) = N * exp[-(x - x0)^2 / (2 sigma^2)] * exp(i k0 x)
-
-    Parameters:
-      x0    -- center of the packet (meters)
-      sigma -- spatial width (meters)
-      k0    -- initial wave number / momentum (1/m)
+        int numPoints, double xMin, double xMax,
+        double x0, double sigma, double k0)
 
 
 ================================================================================
-5.  MENU OPTIONS REFERENCE
+5.  MENU OPTIONS REFERENCE (1-50)
 ================================================================================
 
-  Option  Potential                   User Inputs
-  ------  --------------------------  ------------------------------------------
-    1     Infinite Square Well        n (energy level)
-    2     Harmonic Oscillator         n, omega
-    3     Finite Square Well          V0 (well depth, J)
-    4     Coulomb Potential           n (principal quantum number), Z
-    5     Delta Potential             V0 (strength, J*m)
-    6     Double Delta Potential      V0, a (separation, m)
-    7     Step Potential              E (particle energy, J), V0 (step, J)
-    8     Rectangular Barrier         E, V0, a (half-width, m)
-    9     Triangular Well             F (field, J/m), energy (J)
-   10     Parabolic Well              n, omega (rad/s)
-   11     Numerical Solver (FDM)      xMin, xMax, numPoints, numEigenstates,
-                                      then potential sub-menu (1-5)
-   12     Crank-Nicolson Evolution    xMin, xMax, N, dt, steps, snapshot
-                                      interval, V0, a, x0, sigma, k0
+  #   Simulation                        GUI Modes / Features
+  --  --------------------------------  ------------------------------------------
+   1  Infinite Square Well              Energy, wavefunction, momentum space, time
+   2  Harmonic Oscillator               Energy, psi, uncertainty, ladder ops, field
+   3  Finite Square Well                Ground state energy, wavefunction, norm
+   4  Coulomb Potential                 Energy levels, radial wavefunction, time
+   5  Delta Potential                   Bound state energy, wavefunction
+   6  Double Delta Potential            Symmetric bound state, wavefunction
+   7  Step Potential                    Wavefunction in both regions
+   8  Rectangular Barrier              Tunneling wavefunction
+   9  Triangular Well                   Semi-classical wavefunction
+  10  Parabolic Well                    Energy, Hermite-based wavefunction
+  11  Numerical Solver (FDM)            5 potential types, eigenvalues/eigenstates
+  12  Crank-Nicolson Evolution          Gaussian packet, 5 potential types, animation
+  13  Scattering (R, T)                 Step, delta, barrier coefficients
+  14  Kronig-Penney Model               Band structure, dispersion, delta limit
+  15  Tight-Binding Model               E(k) dispersion, effective mass
+  16  HO Full Analysis                  Multi-psi, uncertainties, field, ladder matrices
+  17  2D Box                            Energy levels, 2D wavefunction, degeneracies
+  18  3D Box                            Energy levels, z-slice wavefunction
+  19  Quantum Well/Wire/Dot             Confinement energies, subband dispersion
+  20  Central Potential                 Effective potential, spherical harmonics Y_l^m
+  21  Spherical Well                    Bessel zeros, energy levels, radial psi
+  22  Two-Body Problem                  Reduced mass, two-body Coulomb comparison
+  23  Orbital Angular Momentum          L^2, L_z eigenvalues, ladder operators
+  24  Spin-1/2 System                   Pauli matrices, spin expectations, eigenstates
+  25  Addition of Ang. Momentum         Clebsch-Gordan coefficients, singlet/triplet
+  26  Non-Degen. Pert. Theory           Stark effect (ISW & HO), two-level system
+  27  Degen. Pert. Theory               Two-level splitting, 2x2 diagonalization
+  28  Identical Particles               Symmetric/antisymmetric psi, Slater det, FEM
+  29  Helium & Variational              Unperturbed, 1st-order, variational E(lambda)
+  30  WKB Approximation                 Bohr-Sommerfeld, tunneling, HO/linear comparison
+  31  Time-Dep. Pert. Theory            Sinusoidal transition, Fermi golden rule, Rabi
+  32  Full Hydrogen Atom                Radial R_nl, probability density, expectations
+  33  Fine Structure                    Relativistic, spin-orbit, Darwin corrections
+  34  Zeeman Effect                     Weak-field splitting, Paschen-Back, g-factors
+  35  Partial Wave Analysis             Phase shifts, partial/total cross sections
+  36  Born Approximation                Spherical well, Yukawa, Coulomb, Born vs exact
+  37  Transfer Matrix                   Multilayer transmission, resonant tunneling
+  38  Density of States                 1D/2D/3D free, box, quantum well 2DEG
+  39  Coherent/Squeezed States          Poisson dist, Wigner function, squeezing
+  40  Entanglement/Bell                 Bell states, CHSH, concurrence, entropy
+  41  Variational Method                Gaussian trial, Rayleigh-Ritz, 5 potentials
+  42  Adiabatic/Berry Phase             Berry phase, Landau-Zener, adiabatic parameter
+  43  Density Matrix/Decoherence        Bloch evolution, T1/T2, quantum channels
+  44  Path Integral                     Free/HO propagators, classical paths, convergence
+  45  Quantum Gates/Circuits            Pauli/H/S/T/CNOT/SWAP gates, Bloch vector
+  46  Aharonov-Bohm Effect              Two-slit interference, flux sweep, scattering
+  47  Landau Levels                     Spectrum, DOS, quantum Hall, filling factor
+  48  Hyperfine Structure               21-cm line, Breit-Rabi, Zeeman, gF factors
+  49  Alpha Decay / Gamow               Gamow tunneling, half-life, Geiger-Nuttall,
+                                        stellar fusion (Gamow peak)
+  50  Relativistic QM                   Klein-Gordon dispersion, Dirac hydrogen spectrum,
+                                        Klein paradox, Zitterbewegung, Compton wavelength
 
-  Default particle:  Electron (m = 9.11e-31 kg, L = 1e-10 m, dim = 1).
+  Each option includes:
+    - A "Theory" collapsing header with physics background.
+    - One or more modes selectable via a dropdown.
+    - Interactive parameter inputs (InputDouble, SliderInt, etc.).
+    - A "Compute" button that generates plots and numerical results.
+    - An "Export CSV" button for data export.
 
 
 ================================================================================
@@ -379,23 +803,69 @@
 ================================================================================
 
   The application generates CSV files in the current working directory.
-  The exact filenames depend on the chosen menu option:
+  Files are produced when the user clicks "Export CSV" in any simulation.
 
-    box_wavefunction.csv               -- Infinite square well psi(x)
-    oscillator_wavefunction.csv        -- Harmonic oscillator psi(x)
-    finite_well_wavefunction.csv       -- Finite square well psi(x)
-    finite_well_time_evolution.csv     -- Finite well time evolution (placeholder)
-    coulomb_wavefunction.csv           -- Coulomb radial wavefunction R(r)
-    coulomb_time.csv                   -- Coulomb time evolution
-    delta_wavefunction.csv             -- Delta potential psi(x)
-    double_delta_wavefunction.csv      -- Double delta psi(x)
-    step_potential_wavefunction.csv    -- Step potential psi(x)
-    barrier_wavefunction.csv           -- Rectangular barrier psi(x)
-    triangular_well.csv                -- Triangular well psi(x)
-    parabolic_well_wavefunction.csv    -- Parabolic well psi(x)
-    fdm_output.csv                     -- FDM eigenstates (x, psi0, psi1, ...)
-    fdm_energies.csv                   -- FDM energy eigenvalues
-    cn_time.csv                        -- Crank-Nicolson time snapshots
+  Common output files by category:
+
+  Basic Potentials (Options 1-10):
+    box_wavefunction.csv               finite_well_wavefunction.csv
+    oscillator_wavefunction.csv        coulomb_wavefunction.csv
+    coulomb_time.csv                   delta_wavefunction.csv
+    double_delta_wavefunction.csv      step_potential_wavefunction.csv
+    barrier_wavefunction.csv           triangular_well.csv
+    parabolic_well_wavefunction.csv
+
+  Numerical (Options 11-12):
+    fdm_output.csv                     fdm_energies.csv
+    cn_time.csv
+
+  Scattering & Band Structure (Options 13-15):
+    scattering_rt.csv                  kronig_penney_bands.csv
+    tight_binding_dispersion.csv
+
+  Multi-Dimensional (Options 16-19):
+    ho_wavefunctions.csv               box2d_wavefunction.csv
+    box2d_levels.csv                   box3d_slice.csv
+    box3d_levels.csv                   quantum_well_subbands.csv
+
+  Angular Momentum & Spin (Options 20-25):
+    effective_potential.csv            spherical_harmonics.csv
+    spherical_well_levels.csv          two_body_comparison.csv
+    orbital_am.csv                     pauli_matrices.csv
+    clebsch_gordan.csv                 singlet_triplet.csv
+
+  Perturbation Theory (Options 26-27):
+    stark_isw.csv                      stark_ho.csv
+    two_level_comparison.csv           degenerate_two_level.csv
+
+  Many-Body & Variational (Options 28-29):
+    two_particle_isw.csv               free_electron_model.csv
+    helium_variational.csv
+
+  Advanced Topics (Options 30-50):
+    wkb_comparison.csv                 transition_prob.csv
+    rabi_oscillations.csv              hydrogen_radial.csv
+    hydrogen_probability.csv           fine_structure.csv
+    zeeman.csv                         partial_wave.csv
+    differential_cs.csv                born_differential.csv
+    born_vs_exact.csv                  transfer_matrix.csv
+    resonant_tunneling.csv             dos_free.csv
+    dos_quantum_well.csv               coherent_state.csv
+    wigner_function.csv                bell_analysis.csv
+    chsh_sweep.csv                     variational_sweep.csv
+    rayleigh_ritz.csv                  berry_phase.csv
+    landau_zener.csv                   bloch_evolution.csv
+    quantum_channels.csv               free_propagator.csv
+    ho_propagator.csv                  classical_paths.csv
+    path_integral_convergence.csv      gate_matrices.csv
+    two_qubit_state.csv                ab_interference.csv
+    ab_scattering.csv                  ab_flux_sweep.csv
+    landau_spectrum.csv                landau_dos.csv
+    quantum_hall.csv                   breit_rabi.csv
+    hyperfine_spectrum.csv             hyperfine_zeeman.csv
+    gamow_tunneling.csv                alpha_decay.csv
+    gamow_peak.csv                     relativistic_dispersion.csv
+    dirac_hydrogen.csv                 klein_paradox.csv
 
   All CSV files use comma-separated values with a header row.
 
@@ -408,7 +878,7 @@
   data produced by the Crank-Nicolson solver.
 
   Usage:
-    1. Run the application with menu option 12 to generate cn_time.csv.
+    1. Run the application with option 12 to generate cn_time.csv.
     2. From the repository root, execute:
 
          python animate_time.py
@@ -417,49 +887,68 @@
 
   Requirements:
     - Python 3.x
-    - pandas
-    - numpy
-    - matplotlib
-
-  The script reads cn_time.csv by default.  To change the input file,
-  edit the CSV variable at the top of the script.
+    - pandas, numpy, matplotlib
 
   To save the animation:
     - As MP4:  ani.save("evolution.mp4", fps=30)   (requires ffmpeg)
     - As GIF:  ani.save("evolution.gif", fps=20)   (requires Pillow)
+
+  Note: The built-in ImPlot plotting in the GUI provides real-time
+  visualization for all 50 simulation options without requiring Python.
 
 
 ================================================================================
 8.  EXTENDING THE PROJECT
 ================================================================================
 
-  Adding a New Analytical Potential
-  ---------------------------------
-  1. Declare new methods in QuantumParticle.h:
-       - computeEnergy...()       for eigenvalues
-       - compute...Psi()          for the spatial wavefunction
-       - export...CSV()           for file output
+  Adding a New Simulation Option
+  ------------------------------
+  The project follows a strict 4-file pattern for each option:
 
-  2. Implement them in QuantumParticle.cpp following the existing patterns.
+  1. QuantumParticle.h  -- Declare new methods in the appropriate section.
+     Insert before the closing  };  of the class.
 
-  3. Add a new  else if (choice == N)  block in main.cpp with the
-     appropriate user prompts and function calls.
+  2. QuantumParticle.cpp -- Implement the physics.  Append a new section
+     block at the end of the file.
+
+  3. GuiApp.h  -- Add  void renderSimNN_Name();  before  };
+
+  4. GuiApp.cpp -- Four changes:
+     a. Add a menu string to the  names[]  array.
+     b. Increment the loop count in  for (int i = 0; i < N; ++i).
+     c. Add a  case N-1:  in the switch statement.
+     d. Append the  void GuiApp::renderSimNN_Name()  function body.
+
+  Build and verify with CMake / Ninja.
+
+  GUI Conventions
+  ---------------
+  - Use ImGui::CollapsingHeader("Theory: ...") for physics background.
+  - Use ImGui::Combo for mode selection when multiple sub-features exist.
+  - Use static local variables for parameter persistence across frames.
+  - Use clearPlot() before adding new curves.
+  - Use addCurve(label, xVec, yVec) -- label is the FIRST argument.
+  - Use std::ostringstream for building resultText.
+  - Append ##UniqueID to button/widget labels to avoid ImGui ID conflicts.
 
   Adding a New Numerical Potential to the FDM Solver
   ---------------------------------------------------
-  1. In the  choice == 11  block of main.cpp, add a new  else if (p == N)
-     case that fills the vector V with the desired potential values.
+  In the FDM render function, add a new potential type case that fills the
+  potential vector V.  No changes to NumericalSolver are needed.
 
-  2. No changes to NumericalSolver are needed; it accepts arbitrary V.
-
-  Implementing Higher Hermite Polynomials
-  ----------------------------------------
-  In computeHarmonicOscillatorPsi() and computeParabolicWellWavefunction(),
-  replace the placeholder  hermite = 0.0  for n >= 2 with the recurrence:
-    H_{n+1}(y) = 2 y H_n(y) - 2 n H_{n-1}(y)
-  where y = sqrt(alpha) * x.
+  Physical Constants
+  ------------------
+  All SI constants are defined locally in each function:
+    hbar     = 1.0545718e-34    J*s
+    e        = 1.602176634e-19  C
+    c        = 2.99792458e8     m/s
+    me       = 9.1093837015e-31 kg
+    epsilon0 = 8.854187817e-12  F/m
+    a0       = 5.29177210903e-11 m  (Bohr radius)
+    alpha    = 1/137.035999084      (fine structure constant)
 
 
 ================================================================================
   Repository:  https://github.com/StavrosMetalGear/QuantumCore
+  Version:     1.0 — 50 simulation options (first upgrade plan complete)
 ================================================================================
